@@ -1,0 +1,11 @@
+node_modules/
+dist/
+content-source/
+content-private/
+work/
+playwright-report/
+test-results/
+*.pdf
+__pycache__/
+*.pyc
+*.tsbuildinfo
