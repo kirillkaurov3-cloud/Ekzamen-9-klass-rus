@@ -6,6 +6,12 @@ permissions:
   contents: read
 jobs:
   check:
+    strategy:
+      fail-fast: false
+      matrix:
+        base: ["/", "/Ekzamen-9-klass-rus/"]
+    env:
+      OGE_BASE_PATH: ${{ matrix.base }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,12 +26,9 @@ jobs:
       - run: npm run content:validate
       - run: npm run build
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e -- --output=test-results/root
-      - run: npm run test:e2e -- --output=test-results/prefix
-        env:
-          OGE_BASE_PATH: /repo/
+      - run: npm run test:e2e
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: browser-results
+          name: browser-results-${{ strategy.job-index }}
           path: test-results/

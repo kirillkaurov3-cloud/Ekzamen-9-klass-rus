@@ -6,14 +6,14 @@ async function startFirstTopic(page:Page){await page.goto('#/topics/t2');await p
 
 test('first launch, theory, incorrect answer, reload, and correction',async({page})=>{
  await open(page);await page.goto('#/topics/t2');await page.getByRole('link',{name:'Грамматическая основа',exact:true}).click();await expect(page.getByRole('heading',{name:'Грамматическая основа',exact:true})).toBeVisible();
- await startFirstTopic(page);await page.getByRole('button',{name:/город спал/}).click();await page.getByRole('button',{name:'Проверить',exact:true}).click();await expect(page.getByRole('status')).toContainText('Пока неверно');
- await page.getByRole('button',{name:'Показать разбор'}).click();await expect(page.getByText('Верный ответ:',{exact:true})).toBeVisible();await page.reload();await expect(page.getByRole('status')).toContainText('Пока неверно');
+ await startFirstTopic(page);await page.getByRole('button',{name:/город спал/}).click();await page.getByRole('button',{name:'Проверить',exact:true}).click();await expect(page.getByRole('status',{name:'Результат ответа'})).toContainText('Пока неверно');
+ await page.getByRole('button',{name:'Показать разбор'}).click();await expect(page.getByText('Верный ответ:',{exact:true})).toBeVisible();await page.reload();await expect(page.getByRole('status',{name:'Результат ответа'})).toContainText('Пока неверно');
  await page.goto('#/errors');await expect(page.getByText('1 в очереди',{exact:true})).toBeVisible();await page.getByRole('button',{name:/Повторить 1 заданий/}).click();await expect(page.getByRole('dialog')).toBeVisible();await page.getByRole('button',{name:'Завершить и перейти дальше'}).click();
- await page.getByRole('button',{name:/город спал/}).click();await page.getByRole('button',{name:/мы вышли; ветер коснулся/}).click();await page.getByRole('button',{name:'Проверить',exact:true}).click();await expect(page.getByRole('status')).toContainText('Верно!');await page.getByRole('button',{name:'К результату'}).click();await page.goto('#/errors');await expect(page.getByRole('heading',{name:'Здесь пока чисто'})).toBeVisible();
+ await page.getByRole('button',{name:/город спал/}).click();await page.getByRole('button',{name:/мы вышли; ветер коснулся/}).click();await page.getByRole('button',{name:'Проверить',exact:true}).click();await expect(page.getByRole('status',{name:'Результат ответа'})).toContainText('Верно!');await page.getByRole('button',{name:'К результату'}).click();await expect(page).toHaveURL(/#\/result\//);await page.goto('#/errors');await expect(page.getByRole('heading',{name:'Здесь пока чисто'})).toBeVisible();
 });
 
 test('draft restored and mini-variant hides answers until atomic submission',async({page})=>{
- await open(page);await startFirstTopic(page);await page.getByRole('button',{name:/город спал/}).click();await page.reload();await expect(page.getByRole('button',{name:/город спал/})).toHaveAttribute('aria-pressed','true');
+ await open(page);await startFirstTopic(page);await page.getByRole('button',{name:/город спал/}).click();await expect(page.getByText('Ответ сохранён',{exact:true})).toBeVisible();await page.reload();await expect(page.getByRole('button',{name:/город спал/})).toHaveAttribute('aria-pressed','true');
  await page.goto('#/mini');await page.getByRole('button',{name:/5 заданий.*10 минут/}).click();await page.getByRole('button',{name:'Завершить и перейти дальше'}).click();
  await expect(page.getByRole('button',{name:'Проверить',exact:true})).toHaveCount(0);await expect(page.getByText('Верный ответ:',{exact:true})).toHaveCount(0);await page.getByRole('button',{name:'Сдать',exact:true}).click();await expect(page.getByRole('dialog')).toContainText('Без ответа: 5');await page.getByRole('button',{name:'Сдать и посмотреть результат'}).click();await expect(page.getByText('0 / 5',{exact:true})).toBeVisible();await page.reload();await expect(page.getByText('0 / 5',{exact:true})).toBeVisible();
 });
@@ -46,4 +46,19 @@ test('timer expires once after background time and supports keyboard navigation'
  await page.clock.install();await open(page);await page.keyboard.press('Tab');await expect(page.locator(':focus')).toBeVisible();
  await page.goto('#/mini');await page.getByRole('button',{name:/5 заданий.*10 минут/}).click();await expect(page.getByRole('heading',{name:'Задание 1 из 5'})).toBeVisible();
  await page.clock.fastForward(600001);await expect(page.getByText('0 / 5',{exact:true})).toBeVisible();await page.reload();await page.goto('#/progress');await expect(page.getByRole('link',{name:/0 из 5/})).toHaveCount(1);
+});
+
+ test('theory leads directly to a practice session',async({page})=>{
+  await open(page);await page.goto('#/topics/t2');await page.getByRole('link',{name:'Грамматическая основа',exact:true}).click();
+  await page.getByRole('button',{name:'Закрепить тему'}).click();await expect(page.getByRole('heading',{name:'Задание 1 из 3'})).toBeVisible();
+ });
+
+test('production shell loads without console, page, or asset errors',async({page})=>{
+ const errors:string[]=[];
+ page.on('pageerror',e=>errors.push(e.message));
+ page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
+ page.on('requestfailed',r=>errors.push(`${r.url()}: ${r.failure()?.errorText}`));
+ page.on('response',r=>{if(r.status()>=400)errors.push(`${r.status()}: ${r.url()}`);});
+ await open(page);await page.evaluate(async()=>{await navigator.serviceWorker.ready;});
+ await page.goto('#/topics');await expect(page.locator('h1')).toBeVisible();expect(errors).toEqual([]);
 });
