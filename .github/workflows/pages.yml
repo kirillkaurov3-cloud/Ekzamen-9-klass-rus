@@ -34,10 +34,15 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
-      - name: Использовать GitHub Actions для Pages
+      - name: Проверить источник GitHub Pages
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh api --method PUT "repos/$GITHUB_REPOSITORY/pages" -f build_type=workflow
+        run: |
+          source=$(gh api "repos/$GITHUB_REPOSITORY/pages" --jq .build_type)
+          if [ "$source" != "workflow" ]; then
+            echo "::error::Откройте Settings → Pages → Source → GitHub Actions, затем повторите запуск workflow."
+            exit 1
+          fi
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
