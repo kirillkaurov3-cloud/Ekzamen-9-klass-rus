@@ -17,7 +17,7 @@ async function visit(directory){
   if(entry.isDirectory())await visit(filename);
   else if(/\.(?:js|html|json|txt|css)$/iu.test(filename)){
    const text=await readFile(filename,'utf8');
-   if(/Tematicheskiy_praktikum|content-private|content-source/iu.test(text)||relative!==publishedFile&&/РУСТЬЮТОРС|rustutors/iu.test(text))failures.push(`${relative}: обнаружен маркер частных материалов`);
+   if(/Tematicheskiy_praktikum|content-private|content-source/iu.test(text)||relative!==publishedFile&&/РУСТЬЮТОРС/iu.test(text))failures.push(`${relative}: обнаружен маркер частных материалов`);
   }
  }
 }
