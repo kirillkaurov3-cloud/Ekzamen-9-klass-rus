@@ -79,3 +79,10 @@ it('keeps the exact timed plan even when previous attempts change priorities',as
 it('refreshes demo explanations without losing drafts or checked progress',async()=>{
  let s=await store.loadState();await store.startSession(['demo-2-1'],'practice',1);await store.saveDraft('demo-2-1',['1','3']);await store.checkCurrent();s=await store.loadState();const before=s.attempts;const old={...s.pack,theory:[],tasks:s.pack.tasks.map(t=>({...t,explanation:[]}))};await store.db.packs.put(old);s=await store.loadState();expect(s.attempts).toEqual(before);expect(s.active?.drafts['demo-2-1']).toEqual(['1','3']);expect(s.pack.tasks[0].explanation[0]).toHaveProperty('text',expect.stringContaining('туман'));
 });
+
+it('persists a diagnostic plan and grades it only once on submission',async()=>{
+ const s=await store.loadState();const {diagnosticPlan}=await import('../src/domain/learning');const ids=diagnosticPlan(s.pack,s.attempts);const started=await store.startSession(ids,'diagnostic',10);await store.saveDraft(ids[0],s.pack.tasks.find(t=>t.id===ids[0])!.key);await store.setPosition(3);expect((await store.checkCurrent()).attempts).toHaveLength(0);const restored=await store.loadState();expect(restored.active?.taskIds).toEqual(ids);expect(restored.active?.position).toBe(3);expect(restored.active?.endsAt).toBeUndefined();await Promise.all([store.finishSession(),store.finishSession()]);const finished=await store.loadState();expect(finished.sessions[0].id).toBe(started.active?.id);expect(finished.attempts).toHaveLength(10);expect(finished.attempts.filter(a=>a.result==='skipped')).toHaveLength(9);
+});
+it('refuses to save an incomplete or duplicated diagnostic plan',async()=>{
+ const s=await store.loadState();await expect(store.startSession([s.pack.tasks[0].id],'diagnostic',10)).rejects.toThrow('10 заданий');expect((await store.loadState()).active).toBeNull();
+});

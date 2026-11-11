@@ -69,7 +69,7 @@ class TheoryAndReviewTests(unittest.TestCase):
         self.assertIsNone(module.theory_fragment(module.Document(['Текст\n']),1,1))
     def test_reviewed_source_is_not_a_graded_key(self):
         doc=module.Document(['Условие\n','Ключ\n'])
-        candidate={'id':'synthetic12','oge':12,'topic':'synthetic-topic','body':'Собственное условие', 'pages':[1], 'key':{'key':'слово','start':doc.offsets[1],'end':len(doc.text)}}
+        candidate={'id':'synthetic12','oge':12,'kind':'text','topic':'synthetic-topic','body':'Собственное условие', 'pages':[1], 'key':{'key':'слово','start':doc.offsets[1],'end':len(doc.text)}}
         task=module.review_task(candidate,doc)
         self.assertTrue(task['reviewRequired']);self.assertFalse(task['timed']);self.assertEqual(task['type'],'self')
         self.assertEqual(task['source']['answerPages'],[2]);self.assertEqual(task['explanation'][-1]['text'],'слово')
@@ -88,5 +88,13 @@ class ReviewedTaskTests(unittest.TestCase):
             with self.assertRaises(ValueError):module.reviewed_task(self.candidate(),{**self.override(),**patch},'edition')
         override=self.override();override['task']['id']='different'
         with self.assertRaises(ValueError):module.reviewed_task(self.candidate(),override,'edition')
+
+class SourceTableTests(unittest.TestCase):
+    def test_preserves_table_columns_but_never_grades_it(self):
+        doc=module.Document(['Условие\n','Разбор\n'])
+        c={'id':'synthetic7-table','oge':7,'kind':'table','topic':'synthetic-topic','body':'Заполните собственную таблицу','pages':[1], 'key':{'key':'12','table':'№   Морфема        Правило\n1   Корень         Тестовая строка','start':doc.offsets[1],'end':len(doc.text)}}
+        t=module.review_task(c,doc)
+        self.assertEqual(t['explanation'][-1]['text'],c['key']['table'])
+        self.assertFalse(t['timed']);self.assertTrue(t['reviewRequired']);self.assertEqual(t['type'],'self')
 
 if __name__=='__main__': unittest.main()

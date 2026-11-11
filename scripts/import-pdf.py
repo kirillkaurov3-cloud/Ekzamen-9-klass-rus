@@ -111,8 +111,8 @@ def review_task(candidate, doc):
             'reviewRequired':True,'verification':'rules','prompt':blocks(candidate['body']),
             'sourceKey':key['key'],
             'explanation':[{'type':'emphasis','text':'Ключ на сверке. Эта запись не оценивается.'},
-                           {'type':'paragraph','text':'Фрагмент ключа из пособия; допустимые словоформы и сопоставление ещё требуют проверки.'},
-                           {'type':'preformatted','text':key['key'] + ('\n' + key['explanation'] if key.get('explanation') else '')}],
+                           {'type':'paragraph','text':'Фрагмент таблицы разбора; перенос строк и ячеек ещё требует сверки.' if candidate['kind']=='table' else 'Фрагмент ключа из пособия; допустимые словоформы и сопоставление ещё требуют проверки.'},
+                           {'type':'preformatted','text':key['table'] if candidate['kind']=='table' and key.get('table') else key['key'] + ('\n' + key['explanation'] if key.get('explanation') else '')}],
             'source':{'title':'РУСТЬЮТОРС. Тематический практикум ОГЭ 2026–2027',
                       'pages':candidate['pages'],'answerPages':doc.span(key['start'],key['end'])}}
 
@@ -320,11 +320,11 @@ def run(args):
             c['status']='manual' if reviewed else 'automatic'
             tasks.append({'id':c['id'],'version':1,'oge':c['oge'],'topicIds':[c['topic']],'type':'multi' if kind in ['choice','choice-long'] else kind,'prompt':blocks(prompt),'options':opts,**({'textId':c['textId']} if c['textId'] else {}),'sourceKey':key['key'],'key':answer[0] if kind in ['text','boolean'] else answer,'accepted':answer if kind=='text' else [],'policy':{'yo':'strict','ignoreSpaces':policy['ignoreSpaces']},'explanation':blocks(key.get('explanation','')),'source':{'title':'РУСТЬЮТОРС. Тематический практикум ОГЭ 2026–2027','pages':c['pages'],'answerPages':doc.span(key['start'],key['end'])},'verification':'manual' if reviewed else 'rules','timed':True})
     for candidate in candidates:
-        if candidate['status']=='review' and candidate['oge']==12:
+        if candidate['status']=='review' and (candidate['oge']==12 or candidate['kind']=='table'):
             task=review_task(candidate,doc)
             if task:
                 tasks.append(task);candidate['status']='selfCheck'
-    pack={'schemaVersion':1,'packId':EDITION,'packVersion':'1.0.0+'+checksum[:12]+'.theory1.'+hashlib.sha256(json.dumps(corrections,sort_keys=True,ensure_ascii=False).encode()).hexdigest()[:8],'title':'Тематический практикум ОГЭ 2026–2027 · локальный импорт','source':{'title':'РУСТЬЮТОРС. Тематический практикум ОГЭ 2026–2027','checksum':checksum},'topics':topics,'texts':texts,'theory':theory,'tasks':tasks}
+    pack={'schemaVersion':1,'packId':EDITION,'packVersion':'1.0.0+'+checksum[:12]+'.theory2.'+hashlib.sha256(json.dumps(corrections,sort_keys=True,ensure_ascii=False).encode()).hexdigest()[:8],'title':'Тематический практикум ОГЭ 2026–2027 · локальный импорт','source':{'title':'РУСТЬЮТОРС. Тематический практикум ОГЭ 2026–2027','checksum':checksum},'topics':topics,'texts':texts,'theory':theory,'tasks':tasks}
     def write(name,data): (out/name).write_text(json.dumps(data,ensure_ascii=False,indent=2,sort_keys=True)+'\n')
     # The same Zod schema validates build-time and browser imports. Keep the previous
     # valid pack intact if validation fails. No unchecked pack is published.
