@@ -80,6 +80,27 @@ def options_from(s,sep=')'):
         options.append({'id':m[1],'text':normalize(val)})
     return prompt,options
 
+SPACING_REVIEW = 'Слитный ключ №9: требуется проверенная читаемая форма; формат пробелов подтверждён, словоформы — нет'
+
+def reviewed_spacing(candidate, override, checksum):
+    """Only a reviewed spacing change; never silently changes words or key address."""
+    if not override.get('answerForms'):
+        return None
+    if candidate['oge'] != 9 or candidate['kind'] != 'text':
+        raise ValueError('Корректировка пробелов поддерживается только для текстовых заданий №9')
+    key = candidate.get('key')
+    if not key or key.get('conflict') or override.get('sourceSha256') != checksum or override.get('sourceKey') != key['key']:
+        raise ValueError('Корректировка не соответствует редакции или исходному ключу: '+candidate['id'])
+    forms = override['answerForms']
+    if not isinstance(forms, list) or not forms or any(not isinstance(f, str) or not f.strip() for f in forms):
+        raise ValueError('Пустые или неверные читаемые формы: '+candidate['id'])
+    compact = lambda x: re.sub(r'\s+', '', x).lower()
+    if [compact(f) for f in forms] != [compact(f) for f in key['key'].split('/')]:
+        raise ValueError('Корректировка меняет слова, порядок или альтернативы: '+candidate['id'])
+    if any(r != SPACING_REVIEW for r in candidate['reasons']):
+        raise ValueError('Есть нерешённые причины помимо пробелов: '+candidate['id'])
+    return [normalize(f) for f in forms]
+
 def run(args):
     inp=Path(args.input); out=Path(args.output_dir)
     out.mkdir(parents=True,exist_ok=True)
@@ -219,7 +240,7 @@ def run(args):
                 if any(not x or '\n' in x for x in answer):c['reasons'].append('Некорректные альтернативы текстового ключа')
                 if c['oge']==9:
                     policy['ignoreSpaces']=True
-                    c['reasons'].append('Слитный ключ №9: требуется проверенная читаемая форма; формат пробелов подтверждён, словоформы — нет')
+                    c['reasons'].append(SPACING_REVIEW)
         if len(prompt)<8:c['reasons'].append('Слишком короткое условие')
         if re.search(r'\w-\s*\n\s*\w',prompt):c['reasons'].append('Подозрительный перенос слова: требуется сверка')
         c['reasons']=list(dict.fromkeys(c['reasons']))
@@ -229,9 +250,12 @@ def run(args):
                 c['status']='excluded';c['reasons']=[override.get('reason','Исключено корректировкой')];continue
             if override.get('task'):
                 task=override['task'];task['verification']='manual';tasks.append(task);c['status']='manual';c['reasons']=[];continue
+        reviewed = reviewed_spacing(c, corrections.get(c['id'], {}), checksum)
+        if reviewed:
+            answer=reviewed;c['reasons']=[]
         if not c['reasons'] and answer is not None:
-            c['status']='automatic'
-            tasks.append({'id':c['id'],'version':1,'oge':c['oge'],'topicIds':[c['topic']],'type':'multi' if kind in ['choice','choice-long'] else kind,'prompt':blocks(prompt),'options':opts,**({'textId':c['textId']} if c['textId'] else {}),'sourceKey':key['key'],'key':answer[0] if kind in ['text','boolean'] else answer,'accepted':answer if kind=='text' else [],'policy':{'yo':'strict','ignoreSpaces':policy['ignoreSpaces']},'explanation':blocks(key.get('explanation','')),'source':{'title':'РУСТЬЮТОРС. Тематический практикум ОГЭ 2026–2027','pages':c['pages'],'answerPages':doc.span(key['start'],key['end'])},'verification':'rules','timed':True})
+            c['status']='manual' if reviewed else 'automatic'
+            tasks.append({'id':c['id'],'version':1,'oge':c['oge'],'topicIds':[c['topic']],'type':'multi' if kind in ['choice','choice-long'] else kind,'prompt':blocks(prompt),'options':opts,**({'textId':c['textId']} if c['textId'] else {}),'sourceKey':key['key'],'key':answer[0] if kind in ['text','boolean'] else answer,'accepted':answer if kind=='text' else [],'policy':{'yo':'strict','ignoreSpaces':policy['ignoreSpaces']},'explanation':blocks(key.get('explanation','')),'source':{'title':'РУСТЬЮТОРС. Тематический практикум ОГЭ 2026–2027','pages':c['pages'],'answerPages':doc.span(key['start'],key['end'])},'verification':'manual' if reviewed else 'rules','timed':True})
     pack={'schemaVersion':1,'packId':EDITION,'packVersion':'1.0.0+'+checksum[:12]+'.'+hashlib.sha256(json.dumps(corrections,sort_keys=True,ensure_ascii=False).encode()).hexdigest()[:8],'title':'Тематический практикум ОГЭ 2026–2027 · локальный импорт','source':{'title':'РУСТЬЮТОРС. Тематический практикум ОГЭ 2026–2027','checksum':checksum},'topics':topics,'texts':texts,'theory':theory,'tasks':tasks}
     def write(name,data): (out/name).write_text(json.dumps(data,ensure_ascii=False,indent=2,sort_keys=True)+'\n')
     # The same Zod schema validates build-time and browser imports. Keep the previous

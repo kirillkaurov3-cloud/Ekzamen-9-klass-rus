@@ -39,4 +39,23 @@ class ImportTests(unittest.TestCase):
         text='Ёлка, бело́к, ст..(1)ной'
         self.assertEqual(module.blocks(text)[0]['text'],text)
 
+class ReviewedSpacingTests(unittest.TestCase):
+    def candidate(self):
+        return {'id':'synthetic-9-1','oge':9,'kind':'text','key':{'key':'синяякрыша / крышасиняя'},'reasons':[module.SPACING_REVIEW]}
+    def override(self):
+        return {'answerForms':['синяя крыша','крыша синяя'],'sourceSha256':'edition','sourceKey':'синяякрыша / крышасиняя'}
+    def test_only_spacing_changes_and_all_alternatives_survive(self):
+        self.assertEqual(module.reviewed_spacing(self.candidate(),self.override(),'edition'),['синяя крыша','крыша синяя'])
+    def test_rejects_wrong_edition_and_key(self):
+        for patch in [{'sourceSha256':'other'}, {'sourceKey':'other'}]:
+            with self.assertRaises(ValueError): module.reviewed_spacing(self.candidate(),{**self.override(),**patch},'edition')
+    def test_rejects_changed_words_dropped_alternatives_and_empty_forms(self):
+        for forms in [['зелёная крыша','крыша синяя'],['синяя крыша'],['','крыша синяя'],['крыша синяя','синяя крыша']]:
+            with self.assertRaises(ValueError): module.reviewed_spacing(self.candidate(),{**self.override(),'answerForms':forms},'edition')
+    def test_does_not_clear_other_review_reasons(self):
+        candidate=self.candidate();candidate['reasons'].append('Нет подтверждённого условия')
+        with self.assertRaises(ValueError): module.reviewed_spacing(candidate,self.override(),'edition')
+    def test_unreviewed_candidate_stays_in_queue(self):
+        self.assertIsNone(module.reviewed_spacing(self.candidate(),{},'edition'))
+
 if __name__=='__main__': unittest.main()
