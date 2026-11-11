@@ -86,3 +86,21 @@ it('persists a diagnostic plan and grades it only once on submission',async()=>{
 it('refuses to save an incomplete or duplicated diagnostic plan',async()=>{
  const s=await store.loadState();await expect(store.startSession([s.pack.tasks[0].id],'diagnostic',10)).rejects.toThrow('10 заданий');expect((await store.loadState()).active).toBeNull();
 });
+
+it('allows only a manual verification promotion at the same task version and keeps progress',async()=>{
+ const p=pack([task({verification:'rules'})]);await store.importPack(p);await store.startSession([p.tasks[0].id],'practice',1);await store.saveDraft(p.tasks[0].id,['1','12']);await store.checkCurrent();const before=await store.finishSession();
+ const upgraded={...p,packVersion:'2',tasks:[{...p.tasks[0],verification:'manual' as const}]};
+ const next=await store.importPack(upgraded);expect(next.attempts).toEqual(before.attempts);expect(stats(next.pack,next.attempts).solved).toBe(1);
+ await expect(store.importPack({...upgraded,packVersion:'3',tasks:[{...upgraded.tasks[0],key:['2']}]})).rejects.toThrow('новую версию');
+});
+it('restores a fixed due plan offline, saves its day and advances a repetition only once',async()=>{
+ const p=pack([task(),task({id:'test.2.2'})]);await store.importPack(p);
+ const day1=new Date(2026,10,1,12).getTime();vi.spyOn(Date,'now').mockReturnValue(day1);
+ await store.startSession(p.tasks.map(t=>t.id),'practice',2);await store.saveDraft(p.tasks[0].id,['1','12']);await store.checkCurrent();await store.finishSession();
+ await expect(store.startSession([p.tasks[0].id],'spaced',1)).rejects.toThrow('обновилась');
+ vi.spyOn(Date,'now').mockReturnValue(new Date(2026,10,2,12).getTime());
+ await expect(store.startSession([p.tasks[1].id],'spaced',1)).rejects.toThrow('обновилась');
+ const started=await store.startSession([p.tasks[0].id],'spaced',1);await store.saveDraft(p.tasks[0].id,['1','12']);expect((await store.loadState()).active?.id).toBe(started.active?.id);
+ await Promise.all([store.checkCurrent(),store.checkCurrent()]);const final=await store.finishSession();expect(final.attempts.filter(a=>a.mode==='spaced')).toHaveLength(1);expect(final.attempts.at(-1)?.localDay).toBe('2026-11-02');
+ const {repetitionSchedule}=await import('../src/domain/repetition');expect(repetitionSchedule(p,final.attempts)[0]).toMatchObject({dueDay:'2026-11-05',step:1});
+});

@@ -1,3 +1,5 @@
+import {diagnosticPlan,missingDiagnosticNumbers,validateDiagnosticPlan} from '../src/domain/learning';
+import {ContentPackSchema} from '../src/domain/schema';
 import {readFileSync} from 'node:fs';
 import {afterEach,expect,it,vi} from 'vitest';
 import {catalog,fetchPublishedPack} from '../src/content/publicPack';
@@ -15,4 +17,8 @@ it('rejects incomplete downloads, HTTP failures and unavailable network',async()
  vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response('{}')));await expect(fetchPublishedPack()).rejects.toThrow('Размер');
  vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response(null,{status:404})));await expect(fetchPublishedPack()).rejects.toThrow('404');
  vi.stubGlobal('fetch',vi.fn().mockRejectedValue(new Error('network')));await expect(fetchPublishedPack()).rejects.toThrow('Проверь интернет');
+});
+
+it('the published workbook has a manually checked diagnostic for every requested number',()=>{
+ const p=ContentPackSchema.parse(JSON.parse(bytes.toString('utf8')));expect(missingDiagnosticNumbers(p)).toEqual([]);expect(validateDiagnosticPlan(p,diagnosticPlan(p,[]))).toBe(true);
 });
