@@ -74,7 +74,7 @@ class TheoryAndReviewTests(unittest.TestCase):
         self.assertTrue(task['reviewRequired']);self.assertFalse(task['timed']);self.assertEqual(task['type'],'self')
         self.assertEqual(task['source']['answerPages'],[2]);self.assertEqual(task['explanation'][-1]['text'],'слово')
         candidate['key']['conflict']=True
-        self.assertIsNone(module.review_task(candidate,doc))
+        self.assertNotIn('sourceKey',module.review_task(candidate,doc))
 
 
 class ReviewedTaskTests(unittest.TestCase):
@@ -96,5 +96,14 @@ class SourceTableTests(unittest.TestCase):
         t=module.review_task(c,doc)
         self.assertEqual(t['explanation'][-1]['text'],c['key']['table'])
         self.assertFalse(t['timed']);self.assertTrue(t['reviewRequired']);self.assertEqual(t['type'],'self')
+
+class MissingKeyTests(unittest.TestCase):
+    def test_retains_condition_without_inventing_an_answer(self):
+        c={'id':'synthetic-missing','oge':6,'topic':'topic','kind':'boolean','body':'Собственное усло-\nвие','pages':[1],'key':None}
+        t=module.review_task(c,module.Document(['Пример\n']))
+        self.assertEqual(t['prompt'][0],{'type':'preformatted','text':c['body']})
+        self.assertEqual(t['source']['answerPages'],[])
+        self.assertNotIn('sourceKey',t);self.assertTrue(t['reviewRequired']);self.assertFalse(t['timed'])
+        self.assertIn('пока не сопоставлен',t['explanation'][1]['text'])
 
 if __name__=='__main__': unittest.main()

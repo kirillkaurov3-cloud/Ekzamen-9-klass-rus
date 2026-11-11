@@ -104,11 +104,18 @@ def theory_fragment(doc, start, end, require_practice=True):
 def review_task(candidate, doc):
     """Expose a source excerpt without asserting a grade or trusted answer."""
     key = candidate.get('key')
-    if not key or key.get('conflict'):
-        return None
+    known = bool(key and not key.get('conflict') and key.get('key'))
+    if not known:
+        return {'id':candidate['id'],'version':1,'oge':candidate['oge'],'topicIds':[candidate['topic']],
+                'type':'self','key':'','timed':False,'reviewRequired':True,'verification':'rules',
+                'prompt':[{'type':'preformatted','text':candidate['body']}],
+                'explanation':[{'type':'emphasis','text':'Ключ на сверке. Эта запись не оценивается.'},
+                               {'type':'paragraph','text':'Ключ пока не сопоставлен с этим заданием. Используйте материал для самостоятельного разбора; образец ответа пока недоступен.'}],
+                'source':{'title':'РУСТЬЮТОРС. Тематический практикум ОГЭ 2026–2027','pages':candidate['pages'],'answerPages':[]}}
     return {'id':candidate['id'],'version':1,'oge':candidate['oge'],
             'topicIds':[candidate['topic']],'type':'self','key':'','timed':False,
-            'reviewRequired':True,'verification':'rules','prompt':blocks(candidate['body']),
+            'reviewRequired':True,'verification':'rules',
+            'prompt':blocks(candidate['body']) if candidate['kind'] in ['table','text'] else [{'type':'preformatted','text':candidate['body']}],
             'sourceKey':key['key'],
             'explanation':[{'type':'emphasis','text':'Ключ на сверке. Эта запись не оценивается.'},
                            {'type':'paragraph','text':'Фрагмент таблицы разбора; перенос строк и ячеек ещё требует сверки.' if candidate['kind']=='table' else 'Фрагмент ключа из пособия; допустимые словоформы и сопоставление ещё требуют проверки.'},
@@ -320,11 +327,11 @@ def run(args):
             c['status']='manual' if reviewed else 'automatic'
             tasks.append({'id':c['id'],'version':1,'oge':c['oge'],'topicIds':[c['topic']],'type':'multi' if kind in ['choice','choice-long'] else kind,'prompt':blocks(prompt),'options':opts,**({'textId':c['textId']} if c['textId'] else {}),'sourceKey':key['key'],'key':answer[0] if kind in ['text','boolean'] else answer,'accepted':answer if kind=='text' else [],'policy':{'yo':'strict','ignoreSpaces':policy['ignoreSpaces']},'explanation':blocks(key.get('explanation','')),'source':{'title':'РУСТЬЮТОРС. Тематический практикум ОГЭ 2026–2027','pages':c['pages'],'answerPages':doc.span(key['start'],key['end'])},'verification':'manual' if reviewed else 'rules','timed':True})
     for candidate in candidates:
-        if candidate['status']=='review' and (candidate['oge']==12 or candidate['kind']=='table'):
+        if candidate['status']=='review':
             task=review_task(candidate,doc)
             if task:
                 tasks.append(task);candidate['status']='selfCheck'
-    pack={'schemaVersion':1,'packId':EDITION,'packVersion':'1.0.0+'+checksum[:12]+'.theory2.'+hashlib.sha256(json.dumps(corrections,sort_keys=True,ensure_ascii=False).encode()).hexdigest()[:8],'title':'Тематический практикум ОГЭ 2026–2027 · локальный импорт','source':{'title':'РУСТЬЮТОРС. Тематический практикум ОГЭ 2026–2027','checksum':checksum},'topics':topics,'texts':texts,'theory':theory,'tasks':tasks}
+    pack={'schemaVersion':1,'packId':EDITION,'packVersion':'1.0.0+'+checksum[:12]+'.theory3.'+hashlib.sha256(json.dumps(corrections,sort_keys=True,ensure_ascii=False).encode()).hexdigest()[:8],'title':'Тематический практикум ОГЭ 2026–2027','source':{'title':'РУСТЬЮТОРС. Тематический практикум ОГЭ 2026–2027','checksum':checksum},'topics':topics,'texts':texts,'theory':theory,'tasks':tasks}
     def write(name,data): (out/name).write_text(json.dumps(data,ensure_ascii=False,indent=2,sort_keys=True)+'\n')
     # The same Zod schema validates build-time and browser imports. Keep the previous
     # valid pack intact if validation fails. No unchecked pack is published.
