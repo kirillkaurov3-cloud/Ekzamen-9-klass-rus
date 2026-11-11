@@ -20,3 +20,9 @@ describe('Единая схема набора',()=>{
   expect(ContentPackSchema.safeParse({...pack(),tasks:[t]}).success).toBe(false);
  });
 });
+
+it('allows source layout fragments and confines review keys to ungraded self-checks',()=>{
+ const p=pack([task({type:'self',key:'',timed:false,reviewRequired:true,explanation:[{type:'preformatted',text:'Колонка А       Колонка Б\nТест            Пример'}]})]);
+ expect(ContentPackSchema.safeParse(p).success).toBe(true);
+ expect(ContentPackSchema.safeParse({...p,tasks:[{...p.tasks[0],type:'text',accepted:['пример'],timed:false}]}).success).toBe(false);
+});

@@ -80,6 +80,42 @@ def options_from(s,sep=')'):
         options.append({'id':m[1],'text':normalize(val)})
     return prompt,options
 
+def theory_fragment(doc, start, end, require_practice=True):
+    """Keep page layout intact and stop at a standalone practice heading."""
+    text, offset = doc.section(start, end)
+    stop = re.search(r'(?m)^[ \t]*ПРАКТИКА(?:[ \t]+[«"][^\n]*)?[ \t]*$', text)
+    if require_practice and not stop:
+        return None
+    length = stop.start() if stop else len(text)
+    if not text[:length].strip():
+        return None
+    last = doc.page(offset + max(0, length - 1))
+    result = []; used_pages = []
+    for page in range(start, last + 1):
+        a = max(offset, doc.offsets[page - 1])
+        b = min(offset + length, doc.offsets[page] - 1 if page < len(doc.pages) else len(doc.text))
+        fragment = doc.text[a:b].strip('\n')
+        if fragment.strip():
+            used_pages.append(page)
+            result.append({'type':'heading','text':f'Страница {page}'})
+            result.append({'type':'preformatted','text':fragment})
+    return {'blocks':result,'pages':used_pages}
+
+def review_task(candidate, doc):
+    """Expose a source excerpt without asserting a grade or trusted answer."""
+    key = candidate.get('key')
+    if not key or key.get('conflict'):
+        return None
+    return {'id':candidate['id'],'version':1,'oge':candidate['oge'],
+            'topicIds':[candidate['topic']],'type':'self','key':'','timed':False,
+            'reviewRequired':True,'verification':'rules','prompt':blocks(candidate['body']),
+            'sourceKey':key['key'],
+            'explanation':[{'type':'emphasis','text':'Ключ на сверке. Эта запись не оценивается.'},
+                           {'type':'paragraph','text':'Фрагмент ключа из пособия; допустимые словоформы и сопоставление ещё требуют проверки.'},
+                           {'type':'preformatted','text':key['key'] + ('\n' + key['explanation'] if key.get('explanation') else '')}],
+            'source':{'title':'РУСТЬЮТОРС. Тематический практикум ОГЭ 2026–2027',
+                      'pages':candidate['pages'],'answerPages':doc.span(key['start'],key['end'])}}
+
 SPACING_REVIEW = 'Слитный ключ №9: требуется проверенная читаемая форма; формат пробелов подтверждён, словоформы — нет'
 
 def reviewed_spacing(candidate, override, checksum):
@@ -100,6 +136,17 @@ def reviewed_spacing(candidate, override, checksum):
     if any(r != SPACING_REVIEW for r in candidate['reasons']):
         raise ValueError('Есть нерешённые причины помимо пробелов: '+candidate['id'])
     return [normalize(f) for f in forms]
+
+def reviewed_task(candidate, override, checksum):
+    task = override.get('task')
+    if not isinstance(task, dict) or override.get('sourceSha256') != checksum:
+        raise ValueError('Ручное задание не привязано к редакции: '+candidate['id'])
+    if override.get('sourceKey') != (candidate.get('key') or {}).get('key'):
+        raise ValueError('Ручное задание не соответствует исходному ключу: '+candidate['id'])
+    if (task.get('id') != candidate['id'] or task.get('oge') != candidate['oge'] or
+        task.get('topicIds') != [candidate['topic']] or task.get('source',{}).get('pages') != candidate['pages']):
+        raise ValueError('Ручное задание меняет составной адрес или страницы: '+candidate['id'])
+    return {**task, 'verification':'manual'}
 
 def run(args):
     inp=Path(args.input); out=Path(args.output_dir)
@@ -208,7 +255,23 @@ def run(args):
                         table=re.split(r'(?im)^\s*Ответ\s*:',s,maxsplit=1)
                         tab=add(n,g,str(q)+'-table', 'Заполните таблицу: часть речи, морфема, правило, восстановленное слово.\n\n'+strip_response(s),a,b,key,'table')
                         tab['reasons'].append('Таблица требует координатного восстановления ячеек и сверки переноса страниц')
-        for g,(tp,title) in enumerate(TOPICS[n]): topics.append({'id':topic_id(n,g),'title':title,'oge':n,'theoryIds':[]})
+        for g,(tp,title) in enumerate(TOPICS[n]):
+            te=TOPICS[n][g+1][0]-1 if g+1<len(TOPICS[n]) else end
+            fragment=theory_fragment(doc,tp,te)
+            theory_ids=[]
+            if fragment:
+                rid=topic_id(n,g)+'-theory';theory_ids.append(rid)
+                theory.append({'id':rid,'title':title,'blocks':fragment['blocks'],
+                               'source':{'title':'РУСТЬЮТОРС. Тематический практикум ОГЭ 2026–2027','pages':fragment['pages'],'checksum':checksum}})
+            topics.append({'id':topic_id(n,g),'title':title,'oge':n,'theoryIds':theory_ids})
+        if TOPICS[n][0][0]>start:
+            overview=theory_fragment(doc,start,TOPICS[n][0][0]-1,require_practice=False)
+            if overview:
+                rid=f'{EDITION}-oge{n}-overview'
+                theory.append({'id':rid,'title':TITLES[n]+' · общий разбор','blocks':overview['blocks'],
+                               'source':{'title':'РУСТЬЮТОРС. Тематический практикум ОГЭ 2026–2027','pages':overview['pages'],'checksum':checksum}})
+                for topic in topics:
+                    if topic['oge']==n: topic['theoryIds'].insert(0,rid)
     # Duplicate composite addresses are never silently admitted.
     duplicate_ids={key for key,count in Counter(c['id'] for c in candidates).items() if count>1}
     for c in candidates:
@@ -249,14 +312,19 @@ def run(args):
             if override.get('exclude'):
                 c['status']='excluded';c['reasons']=[override.get('reason','Исключено корректировкой')];continue
             if override.get('task'):
-                task=override['task'];task['verification']='manual';tasks.append(task);c['status']='manual';c['reasons']=[];continue
+                task=reviewed_task(c,override,checksum);tasks.append(task);c['status']='manual';c['reasons']=[];continue
         reviewed = reviewed_spacing(c, corrections.get(c['id'], {}), checksum)
         if reviewed:
             answer=reviewed;c['reasons']=[]
         if not c['reasons'] and answer is not None:
             c['status']='manual' if reviewed else 'automatic'
             tasks.append({'id':c['id'],'version':1,'oge':c['oge'],'topicIds':[c['topic']],'type':'multi' if kind in ['choice','choice-long'] else kind,'prompt':blocks(prompt),'options':opts,**({'textId':c['textId']} if c['textId'] else {}),'sourceKey':key['key'],'key':answer[0] if kind in ['text','boolean'] else answer,'accepted':answer if kind=='text' else [],'policy':{'yo':'strict','ignoreSpaces':policy['ignoreSpaces']},'explanation':blocks(key.get('explanation','')),'source':{'title':'РУСТЬЮТОРС. Тематический практикум ОГЭ 2026–2027','pages':c['pages'],'answerPages':doc.span(key['start'],key['end'])},'verification':'manual' if reviewed else 'rules','timed':True})
-    pack={'schemaVersion':1,'packId':EDITION,'packVersion':'1.0.0+'+checksum[:12]+'.'+hashlib.sha256(json.dumps(corrections,sort_keys=True,ensure_ascii=False).encode()).hexdigest()[:8],'title':'Тематический практикум ОГЭ 2026–2027 · локальный импорт','source':{'title':'РУСТЬЮТОРС. Тематический практикум ОГЭ 2026–2027','checksum':checksum},'topics':topics,'texts':texts,'theory':theory,'tasks':tasks}
+    for candidate in candidates:
+        if candidate['status']=='review' and candidate['oge']==12:
+            task=review_task(candidate,doc)
+            if task:
+                tasks.append(task);candidate['status']='selfCheck'
+    pack={'schemaVersion':1,'packId':EDITION,'packVersion':'1.0.0+'+checksum[:12]+'.theory1.'+hashlib.sha256(json.dumps(corrections,sort_keys=True,ensure_ascii=False).encode()).hexdigest()[:8],'title':'Тематический практикум ОГЭ 2026–2027 · локальный импорт','source':{'title':'РУСТЬЮТОРС. Тематический практикум ОГЭ 2026–2027','checksum':checksum},'topics':topics,'texts':texts,'theory':theory,'tasks':tasks}
     def write(name,data): (out/name).write_text(json.dumps(data,ensure_ascii=False,indent=2,sort_keys=True)+'\n')
     # The same Zod schema validates build-time and browser imports. Keep the previous
     # valid pack intact if validation fails. No unchecked pack is published.
@@ -266,7 +334,7 @@ def run(args):
     subprocess.run([str(runner),str(validator),str(out/'pack.pending.json')],check=True)
     (out/'pack.pending.json').replace(out/'pack.json')
     write('candidates.json',candidates)
-    write('review.json',{'tasks':[c for c in candidates if c['status']=='review'],'unmatchedBlocks':unmatched})
+    write('review.json',{'tasks':[c for c in candidates if c['status'] in ['review','selfCheck']],'unmatchedBlocks':unmatched})
     inventory=[]
     for i,p in enumerate(pages,1):
         section=next((n for j,(n,a,_) in enumerate(SECTIONS) if a<=i<(SECTIONS[j+1][1] if j+1<len(SECTIONS) else 408)),None)
@@ -274,12 +342,12 @@ def run(args):
     counts=[]
     for n,_,_ in SECTIONS:
         cs=[c for c in candidates if c['oge']==n]
-        counts.append({'oge':n,'found':len(cs),'automatic':sum(c['status']=='automatic' for c in cs),'manual':sum(c['status']=='manual' for c in cs),'selfCheck':0,'review':sum(c['status']=='review' for c in cs),'excluded':sum(c['status']=='excluded' for c in cs)})
-    report={'sourceSha256':checksum,'pagesProcessed':len(pages),'boundaries':boundaries,'counts':counts,'unmatchedBlocks':unmatched,'coverageComplete':False,'note':'Полный постраничный проход выполнен; полнота обнаружения и перенос всех форматов пока не подтверждены. Найдено означает единицы ответа, распознанные правилами, а не независимо установленное полное число упражнений. №7: основной выбор и таблица учитываются отдельно.','keysWithExplanations':sum(bool(t['explanation']) for t in tasks),'imported':len(tasks),'manualVerified':sum(t['verification']=='manual' for t in tasks),'pages':inventory}
+        counts.append({'oge':n,'found':len(cs),'automatic':sum(c['status']=='automatic' for c in cs),'manual':sum(c['status']=='manual' for c in cs),'selfCheck':sum(c['status']=='selfCheck' for c in cs),'review':sum(c['status'] in ['review','selfCheck'] for c in cs),'excluded':sum(c['status']=='excluded' for c in cs)})
+    report={'sourceSha256':checksum,'theoryTopicsWithoutOwnFragment':[t['id'] for t in topics if t['id']+'-theory' not in {r['id'] for r in theory}],'theoryRecords':len(theory),'theoryPages':len({p for t in theory for p in t['source']['pages']}),'pagesProcessed':len(pages),'boundaries':boundaries,'counts':counts,'unmatchedBlocks':unmatched,'coverageComplete':False,'note':'Полный постраничный проход выполнен; полнота обнаружения и перенос всех форматов пока не подтверждены. Найдено означает единицы ответа, распознанные правилами, а не независимо установленное полное число упражнений. №7: основной выбор и таблица учитываются отдельно. Столбец «На сверке» включает записи, доступные для самопроверки; это пересекающиеся метрики.','keysWithExplanations':sum(bool(t['explanation']) for t in tasks),'imported':len(tasks),'manualVerified':sum(t['verification']=='manual' for t in tasks),'pages':inventory}
     write('report.json',report)
     rows=['| № ОГЭ | Обнаружено | Автоматически | Вручную | Самопроверка | На сверке | Исключено |','|---|---:|---:|---:|---:|---:|---:|']
     rows += ['| '+' | '.join(str(r[k]) for k in ['oge','found','automatic','manual','selfCheck','review','excluded'])+' |' for r in counts]
-    (out/'REPORT.md').write_text('# Отчёт локального импорта\n\n'+report['note']+'\n\n'+'\n'.join(rows)+f"\n\nОбработано страниц: {len(pages)}. В пакете: {len(tasks)} заданий. С пояснениями: {report['keysWithExplanations']}. Ручная поштучная сверка всех заданий не выполнена.\n\nПодробности: report.json, review.json, candidates.json и pages.txt. Корректировки: corrections.json.\n\nОткрытые форматы: таблицы №7; допустимые словоформы №12; читаемые ключи №9; значимые символы, подозрительные переносы и несовпадения адресов. Теоретические таблицы сохранены в pages.txt; их семантическая разметка ещё не завершена.\n")
+    (out/'REPORT.md').write_text('# Отчёт локального импорта\n\n'+report['note']+'\n\n'+'\n'.join(rows)+f"\n\nОбработано страниц: {len(pages)}. В пакете: {len(tasks)} заданий. С пояснениями: {report['keysWithExplanations']}. Ручная поштучная сверка всех заданий не выполнена.\n\nПодробности: report.json, review.json, candidates.json и pages.txt. Корректировки: corrections.json.\n\nОткрытые форматы: таблицы №7; допустимые словоформы №12; значимые символы, подозрительные переносы и несовпадения адресов. Теория связана с темами как исходные фрагменты по страницам с сохранением колонок; семантическая разметка таблиц ещё не завершена.\n")
     print(json.dumps({'output':str(out),'counts':counts,'unmatched':unmatched,'imported':len(tasks)},ensure_ascii=False))
 
 if __name__=='__main__':

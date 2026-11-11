@@ -58,4 +58,35 @@ class ReviewedSpacingTests(unittest.TestCase):
     def test_unreviewed_candidate_stays_in_queue(self):
         self.assertIsNone(module.reviewed_spacing(self.candidate(),{},'edition'))
 
+class TheoryAndReviewTests(unittest.TestCase):
+    def test_stops_at_practice_and_preserves_columns(self):
+        doc=module.Document(['ТЕОРИЯ\nСлово       Пример\nА           Б\n','  ПРАКТИКА «ТЕМА»\n1. Упражнение\n'])
+        result=module.theory_fragment(doc,1,2)
+        self.assertEqual(result['pages'],[1])
+        self.assertIn('Слово       Пример',result['blocks'][1]['text'])
+        self.assertNotIn('Упражнение',str(result))
+    def test_does_not_guess_end_of_theory_without_heading(self):
+        self.assertIsNone(module.theory_fragment(module.Document(['Текст\n']),1,1))
+    def test_reviewed_source_is_not_a_graded_key(self):
+        doc=module.Document(['Условие\n','Ключ\n'])
+        candidate={'id':'synthetic12','oge':12,'topic':'synthetic-topic','body':'Собственное условие', 'pages':[1], 'key':{'key':'слово','start':doc.offsets[1],'end':len(doc.text)}}
+        task=module.review_task(candidate,doc)
+        self.assertTrue(task['reviewRequired']);self.assertFalse(task['timed']);self.assertEqual(task['type'],'self')
+        self.assertEqual(task['source']['answerPages'],[2]);self.assertEqual(task['explanation'][-1]['text'],'слово')
+        candidate['key']['conflict']=True
+        self.assertIsNone(module.review_task(candidate,doc))
+
+
+class ReviewedTaskTests(unittest.TestCase):
+    def candidate(self):
+        return {'id':'synthetic12','oge':12,'topic':'topic12','pages':[2],'key':{'key':'тестом'}}
+    def override(self):
+        return {'sourceSha256':'edition','sourceKey':'тестом','task':{'id':'synthetic12','oge':12,'topicIds':['topic12'],'source':{'pages':[2]}}}
+    def test_manual_task_is_bound_to_edition_key_and_address(self):
+        self.assertEqual(module.reviewed_task(self.candidate(),self.override(),'edition')['verification'],'manual')
+        for patch in [{'sourceSha256':'other'},{'sourceKey':'другое'}]:
+            with self.assertRaises(ValueError):module.reviewed_task(self.candidate(),{**self.override(),**patch},'edition')
+        override=self.override();override['task']['id']='different'
+        with self.assertRaises(ValueError):module.reviewed_task(self.candidate(),override,'edition')
+
 if __name__=='__main__': unittest.main()
