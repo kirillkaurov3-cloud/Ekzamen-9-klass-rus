@@ -15,7 +15,7 @@ export function InteractiveStats({state}:{state:State}) {
    <div><dt>Буквы верны</dt><dd>{attempts.filter(a=>a.lettersCorrect).length} / {attempts.length}</dd></div>
    <div><dt>Правила верны</dt><dd>{attempts.filter(a=>a.ruleCorrect).length} / {attempts.length}</dd></div>
    <div><dt>Оба шага самостоятельно</dt><dd>{independent.filter(a=>a.lettersCorrect&&a.ruleCorrect).length} / {independent.length}{independent.length>0&&independent.length<5?' · мало данных':''}</dd></div>
-   <div><dt>С подсказкой</dt><dd>{attempts.length-independent.length}</dd></div>
+   <div><dt>С подсказкой или теорией</dt><dd>{attempts.length-independent.length}</dd></div>
   </dl>
  </section>;
 }
@@ -42,7 +42,7 @@ export function LettersPage({state,run}:{state:State;run:Run}) {
  return <div className="reading"><Link className="back" to="/workshop">← К мастерской</Link><section className="card">
   <span className="badge lime">Серия завершена</span><h1 style={{marginTop:20}}>Буква — и причина</h1>
   <p>Буквы: {results.filter(a=>a.lettersCorrect).length} из {results.length}. Правила: {results.filter(a=>a.ruleCorrect).length} из {results.length}.</p>
-  <p>С подсказкой: {results.filter(a=>a.answer.hintUsed).length}. В статистике самостоятельные ответы учитываются отдельно.</p>
+  <p>С помощью: {results.filter(a=>a.answer.hintUsed).length}. В статистике самостоятельные ответы учитываются отдельно.</p>
   <ul className="repetition-list">{results.map(result=>{
    const ex=exercises.find(e=>e.id===result.exerciseId)!;
    return <li key={result.id}><strong>{ex.before}{ex.letter}{ex.after}</strong><p>{result.lettersCorrect?'✓ Буква верна':'✕ Ошибка в букве'} · {result.ruleCorrect?'✓ Правило верно':'✕ Ошибка в правиле'}</p><p>{ex.explanation}</p></li>;
@@ -52,6 +52,7 @@ export function LettersPage({state,run}:{state:State;run:Run}) {
 }
 
 function LetterQuestion({pack,session,exercise,run}:{pack:ContentPack;session:LearningSession;exercise:LetterExercise;run:Run}) {
+ const navigate=useNavigate();
  const [draft,setDraft]=useState<LetterDraft>(session.drafts[exercise.id]??{letter:'',rule:'',hintUsed:false});
  const [saving,setSaving]=useState(false);
  const [busy,setBusy]=useState(false);
@@ -68,7 +69,7 @@ function LetterQuestion({pack,session,exercise,run}:{pack:ContentPack;session:Le
  const update=async(change:Partial<LetterDraft>)=>{
   if(saving||busy||checked)return;
   const previous=draft;setDraft({...draft,...change});setSaving(true);
-  const next=await run(store.saveLetterDraft(exercise.id,change));if(!next)setDraft(previous);setSaving(false);
+  const next=await run(store.saveLetterDraft(exercise.id,change));if(!next)setDraft(previous);setSaving(false);return next;
  };
  const action=async(next:boolean)=>{if(busy||saving)return;setBusy(true);await run(next?store.nextLetter():store.checkLetterCurrent());setBusy(false);};
  const task=pack.tasks.find(t=>t.id===exercise.taskId)!;
@@ -82,7 +83,7 @@ function LetterQuestion({pack,session,exercise,run}:{pack:ContentPack;session:Le
    <label className="letter-word"><span className="sr-only">Буква в слове {exercise.before}…{exercise.after}</span><span>{exercise.before}</span><select aria-label="Пропущенная буква" value={draft.letter} disabled={!!checked||saving||busy} onChange={e=>void update({letter:e.target.value})}><option value="">…</option><option value="е">е</option><option value="и">и</option></select><span>{exercise.after}</span></label>
    <fieldset className="answer-fieldset"><legend>Какое правило объясняет написание?</legend><div className="options">{exercise.choices.map(choice=><label className="option radio-option" key={choice.id}><input type="radio" name={`rule-${exercise.id}`} value={choice.id} checked={draft.rule===choice.id} disabled={!!checked||saving||busy} onChange={()=>void update({rule:choice.id})}/><span>{choice.text}</span></label>)}</div></fieldset>
    {!checked&&<button className="text-link" disabled={saving||busy||draft.hintUsed} onClick={()=>void update({hintUsed:true})}><Lightbulb size={17}/> {draft.hintUsed?'Подсказка открыта':'Нужна подсказка'}</button>}
-   {draft.hintUsed&&<p className="notice" role="note">{exercise.hint} Этот ответ будет отмечен как решение с подсказкой.</p>}
+   {draft.hintUsed&&<p className="notice" role="note">{exercise.hint} Этот ответ будет отмечен как решение с помощью.</p>}
    {checked&&<div ref={feedback} className="explanation letter-feedback" role="status" aria-label="Результат интерактива">
     <h2>Проверим оба шага</h2>
     <p className={checked.lettersCorrect?'correct-text':'wrong-text'}>{checked.lettersCorrect?'✓ Буква верна':'✕ Ошибка в букве'}. Твой ответ: {checked.answer.letter.toLocaleUpperCase('ru')}. Верно: {exercise.letter.toLocaleUpperCase('ru')}.</p>
@@ -92,7 +93,12 @@ function LetterQuestion({pack,session,exercise,run}:{pack:ContentPack;session:Le
     <p>{exercise.explanation}</p><small>Авторский разбор по таблице ключа, страница 512.</small>
    </div>}
    <details className="source-context"><summary>Показать исходный текст и страницы</summary>{task.prompt.map((block,i)=>'text' in block?<p key={i}>{block.text}</p>:null)}<p>Разбираем пропуск ({exercise.position}). Задание 57 · условие: стр. 285 · ключ: стр. 512.</p><Link className="text-link" to={`/topics/${task.topicIds[0]}`}>Обычная практика № 7</Link></details>
-   {topic?.theoryIds[0]&&<p style={{marginTop:20}}><Link className="text-link" to={`/theory/${topic.theoryIds[0]}?topic=${topic.id}`}>Правило по теме</Link></p>}
+   {topic?.theoryIds[0]&&<p style={{marginTop:20}}><Link className="text-link" to={`/theory/${topic.theoryIds[0]}?topic=${topic.id}`} onClick={async event=>{
+    event.preventDefault();if(saving||busy)return;
+    const target=`/theory/${topic.theoryIds[0]}?topic=${topic.id}`;
+    if(checked||draft.hintUsed){navigate(target);return;}
+    const saved=await update({hintUsed:true});if(saved)navigate(target);
+   }}>Правило по теме</Link><small style={{display:'block',marginTop:8}}>Открытие теории до проверки отмечается как помощь.</small></p>}
   </section>
   <div className="action-bar"><small role="status" aria-label="Сохранение интерактива">{saving?'Сохраняем…':'Черновик сохранён'}</small><button className="button" disabled={busy||saving||!checked&&(!draft.letter||!draft.rule)} onClick={()=>void action(!!checked)}>{checked?session.position+1===session.exerciseIds.length?'Завершить интерактив':'Следующий пример':'Проверить'} {checked?<ArrowRight size={16}/>:<Check size={16}/>}</button></div>
  </div>;

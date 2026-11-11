@@ -14,6 +14,7 @@ export interface LetterExercise {
  hint:string;
  explanation:string;
 }
+/** hintUsed also records opening theory before grading. */
 export interface LetterDraft {letter:string;rule:string;hintUsed:boolean}
 export interface LearningAttempt {
  id:string;
