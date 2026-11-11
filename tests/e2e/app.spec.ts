@@ -5,9 +5,9 @@ async function open(page:Page,path=''){await page.goto(`#/${path}`);await expect
 async function startFirstTopic(page:Page){await page.goto('#/topics/t2');await page.getByRole('button',{name:/Тренироваться/}).click();await expect(page.getByRole('heading',{name:'Задание 1 из 3'})).toBeVisible();}
 
 test('first launch, theory, incorrect answer, reload, and correction',async({page})=>{
- await open(page);await page.goto('#/topics/t2');await page.getByRole('link',{name:'Грамматическая основа',exact:true}).click();await expect(page.getByRole('heading',{name:'Грамматическая основа',exact:true})).toBeVisible();
+ await open(page);await page.goto('#/topics?q=%E2%84%96%202');await page.locator('.topic-card').click();await page.getByRole('link',{name:'Грамматическая основа',exact:true}).click();await expect(page.getByRole('heading',{name:'Грамматическая основа',exact:true})).toBeVisible();
  await startFirstTopic(page);await page.getByRole('button',{name:/город спал/}).click();await page.getByRole('button',{name:'Проверить',exact:true}).click();await expect(page.getByRole('status',{name:'Результат ответа'})).toContainText('Пока неверно');
- await page.getByRole('button',{name:'Показать разбор'}).click();await expect(page.getByText('Верный ответ:',{exact:true})).toBeVisible();await page.reload();await expect(page.getByRole('status',{name:'Результат ответа'})).toContainText('Пока неверно');
+ await page.getByRole('button',{name:'Показать разбор'}).click();await expect(page.getByText('Верный ответ:',{exact:true})).toBeVisible();await expect(page.locator('.explanation')).toContainText('туман поднимался');await expect.poll(async()=>{const top=await page.locator('.explanation').boundingBox();const bar=await page.locator('.action-bar').boundingBox();return !!top&&!!bar&&top.y>=0&&top.y<bar.y;}).toBe(true);await page.reload();await expect(page.getByRole('status',{name:'Результат ответа'})).toContainText('Пока неверно');
  await page.goto('#/errors');await expect(page.getByText('1 в очереди',{exact:true})).toBeVisible();await page.getByRole('button',{name:/Повторить 1 заданий/}).click();await expect(page.getByRole('dialog')).toBeVisible();await page.getByRole('button',{name:'Завершить и перейти дальше'}).click();
  await page.getByRole('button',{name:/город спал/}).click();await page.getByRole('button',{name:/мы вышли; ветер коснулся/}).click();await page.getByRole('button',{name:'Проверить',exact:true}).click();await expect(page.getByRole('status',{name:'Результат ответа'})).toContainText('Верно!');await page.getByRole('button',{name:'К результату'}).click();await expect(page).toHaveURL(/#\/result\//);await page.goto('#/errors');await expect(page.getByRole('heading',{name:'Здесь пока чисто'})).toBeVisible();
 });
@@ -61,4 +61,16 @@ test('production shell loads without console, page, or asset errors',async({page
  page.on('response',r=>{if(r.status()>=400)errors.push(`${r.status()}: ${r.url()}`);});
  await open(page);await page.evaluate(async()=>{await navigator.serviceWorker.ready;});
  await page.goto('#/topics');await expect(page.locator('h1')).toBeVisible();expect(errors).toEqual([]);
+});
+
+for(const count of [5,10])test(`preset ${count} matches promised numbers and survives reload`,async({page})=>{
+ await open(page);await page.goto('#/mini');const card=page.getByRole('button',{name:new RegExp(`${count} заданий`)});const promised=(await card.innerText()).match(/Номера: ([\d, ]+)/)![1].split(',').map(x=>Number(x.trim()));await card.click();const actual:number[]=[];
+ for(let i=0;i<count;i++){await expect(page.getByRole('heading',{name:`Задание ${i+1} из ${count}`})).toBeVisible();actual.push(Number((await page.locator('.question-top .badge').innerText()).replace(/\D/g,'')));if(i<count-1)await page.getByRole('button',{name:'Дальше',exact:true}).click();}
+ expect([...new Set(actual)]).toEqual(promised);await page.reload();await expect(page.getByRole('heading',{name:`Задание ${count} из ${count}`})).toBeVisible();await page.getByRole('button',{name:'Сдать',exact:true}).click();await expect(page.getByRole('dialog')).toContainText(`Без ответа: ${count}`);
+});
+
+test('exact number search and return preserve query and mode',async({page})=>{
+ await open(page);await page.goto('#/topics');for(const q of ['2','№2','№ 2','задание 2']){await page.getByRole('searchbox').fill(q);await expect(page.locator('.topic-card')).toHaveCount(1);await expect(page.locator('.topic-card')).toContainText('№ 2');}
+ await page.getByRole('searchbox').fill('12');await expect(page.locator('.topic-card')).toHaveCount(1);await expect(page.locator('.topic-card')).toContainText('№ 12');await page.getByRole('searchbox').fill('основа');await expect(page.locator('.topic-card')).toHaveCount(1);
+ await page.getByRole('searchbox').fill('№ 2');await page.getByRole('button',{name:'По номерам',exact:true}).click();await page.locator('.topic-card').click();await page.getByRole('link',{name:'Все темы',exact:true}).click();await expect(page.getByRole('searchbox')).toHaveValue('№ 2');await expect(page.getByRole('button',{name:'По номерам',exact:true})).toHaveAttribute('aria-pressed','true');
 });

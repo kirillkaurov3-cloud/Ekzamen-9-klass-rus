@@ -72,3 +72,10 @@ describe('atomic pack imports',()=>{
   expect((await store.loadState()).pack.demo).toBe(true);
  });
 });
+
+it('keeps the exact timed plan even when previous attempts change priorities',async()=>{
+ const p=pack([task(),task({id:'test.2.2',oge:3})]);await store.importPack(p);await store.startSession(['test.2.1'],'practice',1);await store.checkCurrent(true);await store.finishSession();const s=await store.startSession(['test.2.1','test.2.2'],'timed',2);expect(s.active?.taskIds).toEqual(['test.2.1','test.2.2']);expect((await store.loadState()).active?.endsAt).toBe(s.active?.endsAt);
+});
+it('refreshes demo explanations without losing drafts or checked progress',async()=>{
+ let s=await store.loadState();await store.startSession(['demo-2-1'],'practice',1);await store.saveDraft('demo-2-1',['1','3']);await store.checkCurrent();s=await store.loadState();const before=s.attempts;const old={...s.pack,theory:[],tasks:s.pack.tasks.map(t=>({...t,explanation:[]}))};await store.db.packs.put(old);s=await store.loadState();expect(s.attempts).toEqual(before);expect(s.active?.drafts['demo-2-1']).toEqual(['1','3']);expect(s.pack.tasks[0].explanation[0]).toHaveProperty('text',expect.stringContaining('туман'));
+});
