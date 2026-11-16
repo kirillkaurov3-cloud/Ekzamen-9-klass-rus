@@ -22,3 +22,8 @@ it('rewards honest self-assessment equally, never farms repeated same-day cards 
 it('earns a correction badge only for a later independent correct answer',()=>{
  const wrong=attempt({result:'wrong',id:'wrong',checkedAt:1}),right=attempt({id:'right',checkedAt:2});expect(rewards(state({attempts:[wrong,right]})).achievements.find(a=>a.id==='repair')?.earned).toBe(true);expect(rewards(state({attempts:[wrong,{...right,hintUsed:true}]})).achievements.find(a=>a.id==='repair')?.earned).toBe(false);
 });
+
+it('processes a full-size history without recomputing every prefix and keeps the daily cap',()=>{
+ const tasks=Array.from({length:1600},(_,i)=>task({id:`large.${i}`})),p=pack(tasks),events=tasks.map((t,i)=>attempt({id:`large-answer.${i}`,taskId:t.id,checkedAt:at('2026-11-16')+i,localDay:'2026-11-16'}));
+ const result=rewards(state({pack:p,attempts:events}),'2026-11-16');expect(result.total).toBe(100);expect(result.ledger).toHaveLength(10);
+});

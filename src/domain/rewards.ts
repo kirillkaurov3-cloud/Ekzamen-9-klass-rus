@@ -1,5 +1,6 @@
+import {isAssessable} from './learning';
 import type {Attempt,State} from './schema';
-import {addDays,localDay,repetitionSchedule,REPETITION_INTERVALS} from './repetition';
+import {addDays,localDay,advanceRepetition,REPETITION_INTERVALS,type Repetition} from './repetition';
 export const DAILY_XP_LIMIT=100;
 export interface Reward {id:string;day:string;at:number;points:number;reason:string;exercise?:string;limit?:number}
 export const LEVELS=[{at:0,title:'Первые шаги'},{at:50,title:'В ритме'},{at:150,title:'Набираю уверенность'},{at:300,title:'Знаю, как проверить'},{at:600,title:'Уверенная практика'}];
@@ -8,18 +9,18 @@ export function rewards(state:State,day=localDay()) {
  const candidates:Reward[]=[],known=new Set<string>(),first=new Set<string>(),corrected=new Set<string>(),wrong=new Set<string>();
  const canonical=new Map<string,Attempt>();
  for(const a of [...state.attempts,...state.studySessions.flatMap(s=>Object.values(s.results).flatMap(a=>a.canonical?[a.canonical]:[]))])if(a.packId===state.pack.packId)canonical.set(a.id,a);
- const history:Attempt[]=[];
+ const calendar=new Map<string,Repetition>(),versions=new Map(state.pack.tasks.filter(isAssessable).map(t=>[t.id,t.version]));
  for(const a of [...canonical.values()].sort((a,b)=>a.checkedAt-b.checkedAt||a.id.localeCompare(b.id))){
   const key=`task:${a.taskId}:v${a.taskVersion}`,date=a.localDay??localDay(a.checkedAt);
   if(a.result==='wrong')wrong.add(key);
   if(a.result==='correct'&&!a.hintUsed){
    if(wrong.has(key))corrected.add(key);
-   const due=repetitionSchedule(state.pack,history).find(c=>c.taskId===a.taskId);
+   const due=versions.get(a.taskId)===a.taskVersion?calendar.get(a.taskId):undefined;
    const points=!first.has(key)?10:a.mode==='spaced'&&due&&due.dueDay<=date?5:0;
    if(points)candidates.push({id:`answer:${a.id}`,day:date,at:a.checkedAt,points,reason:!first.has(key)?'Первое самостоятельное решение':'Повторение по сроку',exercise:key,limit:10});
    first.add(key);
   }
-  history.push(a);
+  if(versions.get(a.taskId)===a.taskVersion){const next=advanceRepetition(calendar.get(a.taskId),a);if(next)calendar.set(a.taskId,next);}
  }
  const interactive:{id:string;key:string;at:number;day:string;success:boolean}[]=[];
  for(const s of state.learningSessions)for(const a of Object.values(s.results))interactive.push({id:a.id,key:`letter:${a.exerciseId}:v${a.exerciseVersion}`,at:a.checkedAt,day:a.localDay,success:a.lettersCorrect&&a.ruleCorrect&&!a.answer.hintUsed});
