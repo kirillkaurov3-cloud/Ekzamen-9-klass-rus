@@ -1,3 +1,4 @@
+import {published} from '../published';
 import {test,expect,type Page} from '@playwright/test';
 import {GRAMMAR_ACTIVITIES,expectedRoles,type StudyActivity} from '../../src/domain/study';
 import {buildLessonActivities,buildCardActivities} from '../../src/content/studyLessons';
@@ -26,7 +27,7 @@ test('cards keep objective answers separate from self-ratings and become due on 
    await page.getByRole('button',{name:i===4?'Завершить серию':'Следующий шаг',exact:true}).click();
   }
  }
- await expect(page.getByText('На сегодня всё. Можно выбрать свободную практику.',{exact:true})).toBeVisible();await page.screenshot({path:testInfo.outputPath('cards-schedule-390-dark.png'),fullPage:true});await page.goto('#/progress');await expect(page.getByRole('region',{name:'Результаты учебных режимов'})).toContainText('Карточки');await expect(page.getByRole('region',{name:'Результаты учебных режимов'})).toContainText('4 / 5 самостоятельно');await expect(page.getByRole('region',{name:'Результаты учебных режимов'})).toContainText('Карточки с самооценкой: 5.');await expect(page.locator('.stat-number').first()).toHaveText('0 / 1411');
+ await expect(page.getByText('На сегодня всё. Можно выбрать свободную практику.',{exact:true})).toBeVisible();await page.screenshot({path:testInfo.outputPath('cards-schedule-390-dark.png'),fullPage:true});await page.goto('#/progress');await expect(page.getByRole('region',{name:'Результаты учебных режимов'})).toContainText('Карточки');await expect(page.getByRole('region',{name:'Результаты учебных режимов'})).toContainText('4 / 5 самостоятельно');await expect(page.getByRole('region',{name:'Результаты учебных режимов'})).toContainText('Карточки с самооценкой: 5.');await expect(page.locator('.stat-number').first()).toHaveText(`0 / ${published.graded}`);
  await page.clock.setSystemTime(new Date(2026,10,17,12));await page.goto('#/workshop/cards');await page.reload();await expect(page.getByRole('button',{name:'Начать серию карточек'})).toBeVisible();
  for(const width of [360,430,1280]){await page.setViewportSize({width,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
 });

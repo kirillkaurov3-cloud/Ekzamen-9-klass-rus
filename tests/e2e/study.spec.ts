@@ -1,3 +1,4 @@
+import {published} from '../published';
 import {test,expect,type Page} from '@playwright/test';
 import {GRAMMAR_ACTIVITIES,REASON_ACTIVITIES,expectedRoles,wordTokens,type StudyActivity} from '../../src/domain/study';
 const saved=(page:Page)=>expect(page.getByRole('status',{name:'Сохранение учебного шага'})).toHaveText('Черновик сохранён');
@@ -20,7 +21,7 @@ test('grammar preserves original sentence, keyboard selections and offline feedb
   if(i===4){for(const width of [360,390,430,1280]){await page.setViewportSize({width,height:900});await page.emulateMedia({colorScheme:'dark',reducedMotion:'reduce'});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}await page.setViewportSize({width:390,height:844});await page.screenshot({path:testInfo.outputPath('grammar-long-390-dark.png'),fullPage:true});}
   await page.getByRole('button',{name:'Проверить шаг'}).click();await expect(feedback).toContainText('✓ Верно');
  }
- await page.getByRole('button',{name:'Завершить серию'}).click();await expect(page.getByText('Верно: 4 из 5. С помощью: 1.',{exact:true})).toBeVisible();await page.getByRole('link',{name:'Мой прогресс',exact:true}).click();await expect(page.getByRole('region',{name:'Результаты учебных режимов'})).toContainText('4 / 4 самостоятельно · с помощью: 1');await expect(page.locator('.stat-number').first()).toHaveText('0 / 1411');await context.setOffline(false);
+ await page.getByRole('button',{name:'Завершить серию'}).click();await expect(page.getByText('Верно: 4 из 5. С помощью: 1.',{exact:true})).toBeVisible();await page.getByRole('link',{name:'Мой прогресс',exact:true}).click();await expect(page.getByRole('region',{name:'Результаты учебных режимов'})).toContainText('4 / 4 самостоятельно · с помощью: 1');await expect(page.locator('.stat-number').first()).toHaveText(`0 / ${published.graded}`);await context.setOffline(false);
 });
 
 test('reasoning independently checks a correction and its evidence, saves hints and supports native radio keys',async({page},testInfo)=>{

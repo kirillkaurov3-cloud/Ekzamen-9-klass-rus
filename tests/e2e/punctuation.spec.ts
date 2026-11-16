@@ -1,3 +1,4 @@
+import {published} from '../published';
 import {test,expect,type Page} from '@playwright/test';
 import {PUNCTUATION_EXERCISES,type PunctuationExercise} from '../../src/domain/punctuation';
 
@@ -32,6 +33,6 @@ test('punctuation: every sign, explicit blanks, keyboard, help, offline grading 
   await page.getByRole('button',{name:'Следующий текст'}).click();await expect(page.getByRole('heading',{name:`Текст ${i+1} из 5`})).toBeVisible();await fill(page,PUNCTUATION_EXERCISES[i]);await saved(page,PUNCTUATION_EXERCISES[i].positions.length,PUNCTUATION_EXERCISES[i].positions.length);await page.getByRole('button',{name:'Проверить знаки'}).click();await expect(feedback).toContainText(`Верно ${PUNCTUATION_EXERCISES[i].positions.length} из ${PUNCTUATION_EXERCISES[i].positions.length} позиций`);
  }
  await page.getByRole('button',{name:'Завершить расстановку'}).click();await expect(page.getByRole('heading',{name:'У каждого знака есть причина'})).toBeVisible();await expect(page.getByText('Верно 42 из 43 позиций. С помощью: 1.',{exact:true})).toBeVisible();await page.reload();await expect(page.getByText('Верно 42 из 43 позиций. С помощью: 1.',{exact:true})).toBeVisible();
- await page.getByRole('link',{name:'Мой прогресс',exact:true}).click();const stats=page.getByRole('region',{name:'Результаты расстановки знаков'});await expect(stats).toContainText('Проверено текстов5');await expect(stats).toContainText('Позиции верны42 / 43');await expect(stats).toContainText('Тексты без ошибок самостоятельно4 / 4');await expect(page.locator('.stat-number').first()).toHaveText('0 / 1411');
+ await page.getByRole('link',{name:'Мой прогресс',exact:true}).click();const stats=page.getByRole('region',{name:'Результаты расстановки знаков'});await expect(stats).toContainText('Проверено текстов5');await expect(stats).toContainText('Позиции верны42 / 43');await expect(stats).toContainText('Тексты без ошибок самостоятельно4 / 4');await expect(page.locator('.stat-number').first()).toHaveText(`0 / ${published.graded}`);
  await page.goto('#/workshop/letters');await expect(page.getByRole('combobox',{name:'Пропущенная буква'})).toHaveValue('и');await context.setOffline(false);
 });

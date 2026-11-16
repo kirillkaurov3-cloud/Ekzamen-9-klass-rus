@@ -1,3 +1,4 @@
+import {published} from '../published';
 import {test,expect} from '@playwright/test';
 import {LETTER_EXERCISES} from '../../src/domain/interactive';
 
@@ -20,7 +21,7 @@ test('letters and rules: keyboard, hint, draft, theory, offline feedback and sep
   const e=LETTER_EXERCISES[i];if(i===1){await page.getByRole('link',{name:'Правило по теме',exact:true}).click();await expect(page).toHaveURL(/#\/theory\//);await expect(page.locator('h1')).toBeVisible();await page.goBack();await expect(page.getByRole('note')).toContainText('решение с помощью');}await page.getByRole('combobox',{name:'Пропущенная буква'}).selectOption(e.letter);await saved();await page.getByRole('radio',{name:e.choices.find(c=>c.id===e.rule)!.text,exact:true}).check();await saved();await page.getByRole('button',{name:'Проверить',exact:true}).click();await expect(feedback).toContainText('✓ Правило верно');
  }
  await page.getByRole('button',{name:'Завершить интерактив'}).click();await expect(page.getByRole('heading',{name:'Буква — и причина'})).toBeVisible();await expect(page.getByText('Буквы: 5 из 5. Правила: 4 из 5.',{exact:true})).toBeVisible();await page.reload();await expect(page.getByText('Буквы: 5 из 5. Правила: 4 из 5.',{exact:true})).toBeVisible();
- await page.getByRole('link',{name:'Мой прогресс',exact:true}).click();const stats=page.locator('section').filter({has:page.getByRole('heading',{name:'Интерактивы: буква и правило',exact:true})});await expect(stats).toContainText('Проверено примеров5');await expect(stats).toContainText('Оба шага самостоятельно3 / 3');await expect(stats).toContainText('С подсказкой или теорией2');await expect(page.locator('.stat-number').first()).toHaveText('0 / 1411');
+ await page.getByRole('link',{name:'Мой прогресс',exact:true}).click();const stats=page.locator('section').filter({has:page.getByRole('heading',{name:'Интерактивы: буква и правило',exact:true})});await expect(stats).toContainText('Проверено примеров5');await expect(stats).toContainText('Оба шага самостоятельно3 / 3');await expect(stats).toContainText('С подсказкой или теорией2');await expect(page.locator('.stat-number').first()).toHaveText(`0 / ${published.graded}`);
  for(const width of [360,430,1280]){await page.setViewportSize({width,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);}
  await context.setOffline(false);
 });
