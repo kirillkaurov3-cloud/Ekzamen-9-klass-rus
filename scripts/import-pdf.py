@@ -283,6 +283,11 @@ def run(args):
     duplicate_ids={key for key,count in Counter(c['id'] for c in candidates).items() if count>1}
     for c in candidates:
         if c['id'] in duplicate_ids:c['reasons'].append('Повтор составного адреса упражнения')
+    semantic_data=json.loads(Path(args.semantic_tables).read_text()) if getattr(args,'semantic_tables',None) else None
+    if semantic_data:
+        from semantic_tables import validate_tables, enrich_table
+        semantic=validate_tables(semantic_data,checksum)
+    else: semantic={}
     # Convert candidates only after consistency checks.
     tasks=[]
     corrections_path=Path(args.corrections) if args.corrections else out/'corrections.json'
@@ -330,8 +335,10 @@ def run(args):
         if candidate['status']=='review':
             task=review_task(candidate,doc)
             if task:
+                if candidate['id'] in semantic:task=enrich_table(task,candidate,semantic[candidate['id']])
                 tasks.append(task);candidate['status']='selfCheck'
     pack={'schemaVersion':1,'packId':EDITION,'packVersion':'1.0.0+'+checksum[:12]+'.theory3.'+hashlib.sha256(json.dumps(corrections,sort_keys=True,ensure_ascii=False).encode()).hexdigest()[:8],'title':'Тематический практикум ОГЭ 2026–2027','source':{'title':'РУСТЬЮТОРС. Тематический практикум ОГЭ 2026–2027','checksum':checksum},'topics':topics,'texts':texts,'theory':theory,'tasks':tasks}
+    if semantic_data:pack['packVersion']+='.tables1.'+hashlib.sha256(json.dumps(semantic_data,sort_keys=True,ensure_ascii=False).encode()).hexdigest()[:8]
     def write(name,data): (out/name).write_text(json.dumps(data,ensure_ascii=False,indent=2,sort_keys=True)+'\n')
     # The same Zod schema validates build-time and browser imports. Keep the previous
     # valid pack intact if validation fails. No unchecked pack is published.
@@ -350,7 +357,7 @@ def run(args):
     for n,_,_ in SECTIONS:
         cs=[c for c in candidates if c['oge']==n]
         counts.append({'oge':n,'found':len(cs),'automatic':sum(c['status']=='automatic' for c in cs),'manual':sum(c['status']=='manual' for c in cs),'selfCheck':sum(c['status']=='selfCheck' for c in cs),'review':sum(c['status'] in ['review','selfCheck'] for c in cs),'excluded':sum(c['status']=='excluded' for c in cs)})
-    report={'sourceSha256':checksum,'theoryTopicsWithoutOwnFragment':[t['id'] for t in topics if t['id']+'-theory' not in {r['id'] for r in theory}],'theoryRecords':len(theory),'theoryPages':len({p for t in theory for p in t['source']['pages']}),'pagesProcessed':len(pages),'boundaries':boundaries,'counts':counts,'unmatchedBlocks':unmatched,'coverageComplete':False,'note':'Полный постраничный проход выполнен; полнота обнаружения и перенос всех форматов пока не подтверждены. Найдено означает единицы ответа, распознанные правилами, а не независимо установленное полное число упражнений. №7: основной выбор и таблица учитываются отдельно. Столбец «На сверке» включает записи, доступные для самопроверки; это пересекающиеся метрики.','keysWithExplanations':sum(bool(t['explanation']) for t in tasks),'imported':len(tasks),'manualVerified':sum(t['verification']=='manual' for t in tasks),'pages':inventory}
+    report={'sourceSha256':checksum,'theoryTopicsWithoutOwnFragment':[t['id'] for t in topics if t['id']+'-theory' not in {r['id'] for r in theory}],'theoryRecords':len(theory),'theoryPages':len({p for t in theory for p in t['source']['pages']}),'pagesProcessed':len(pages),'boundaries':boundaries,'counts':counts,'unmatchedBlocks':unmatched,'coverageComplete':False,'note':'Полный постраничный проход выполнен; полнота обнаружения и перенос всех форматов пока не подтверждены. Найдено означает единицы ответа, распознанные правилами, а не независимо установленное полное число упражнений. №7: основной выбор и таблица учитываются отдельно. Столбец «На сверке» включает записи, доступные для самопроверки; это пересекающиеся метрики.','keysWithExplanations':sum(bool(t['explanation']) for t in tasks),'imported':len(tasks),'semanticAnswerTables':len(semantic),'manualVerified':sum(t['verification']=='manual' for t in tasks),'pages':inventory}
     write('report.json',report)
     rows=['| № ОГЭ | Обнаружено | Автоматически | Вручную | Самопроверка | На сверке | Исключено |','|---|---:|---:|---:|---:|---:|---:|']
     rows += ['| '+' | '.join(str(r[k]) for k in ['oge','found','automatic','manual','selfCheck','review','excluded'])+' |' for r in counts]
@@ -362,6 +369,7 @@ if __name__=='__main__':
     ap.add_argument('--input',default='content-source/Tematicheskiy_praktikum_2026-2027-2.pdf')
     ap.add_argument('--output-dir',default='content-private/praktikum-2027')
     ap.add_argument('--corrections')
+    ap.add_argument('--semantic-tables',help='Проверенная локальная разметка таблиц №7')
     try:run(ap.parse_args())
     except (ValueError,OSError,subprocess.CalledProcessError) as exc:
         print(f'Импорт остановлен: {exc}',file=sys.stderr);sys.exit(1)

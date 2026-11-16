@@ -1,9 +1,9 @@
 {
   "title": "Тематический практикум ОГЭ 2026–2027",
   "url": "packs/praktikum-2027.json",
-  "sha256": "ba7ecdc142dc7920af5c443fbee8cd6ece5866cd357b392c76485479c161f72a",
-  "bytes": 3231933,
-  "packVersion": "1.0.0+f6ed218ac5b3.theory3.5cf3401c",
+  "sha256": "bcc97fb0c0d1a67a17dbbafd1c1c2fe4a7841d94b5a17ce078cf8a7489402dc9",
+  "bytes": 3196818,
+  "packVersion": "1.0.0+f6ed218ac5b3.theory3.5cf3401c.tables1.8371c2fb",
   "sourceChecksum": "f6ed218ac5b38133e1042d34cabd6cc13ce63b837dd6f4696c5dac85267bf127",
   "tasks": 1627,
   "graded": 1515,
