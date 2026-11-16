@@ -4,7 +4,7 @@ import {LETTER_EXERCISES} from '../../src/domain/interactive';
 test('letters and rules: keyboard, hint, draft, theory, offline feedback and separate progress',async({page,context},testInfo)=>{
  await page.setViewportSize({width:390,height:844});await page.emulateMedia({colorScheme:'dark',reducedMotion:'reduce'});
  await page.goto('./#/workshop');await expect(page.getByRole('heading',{name:'Мастерская правил'})).toBeVisible();
- await page.getByRole('link',{name:'Открыть пособие',exact:true}).click();await page.getByRole('button',{name:'Загрузить и открыть пособие'}).click();await expect(page).toHaveURL(/#\/topics$/,{timeout:30000});
+ await page.getByRole('link',{name:'Открыть пособие',exact:true}).first().click();await page.getByRole('button',{name:'Загрузить и открыть пособие'}).click();await expect(page).toHaveURL(/#\/topics$/,{timeout:30000});
  await page.goto('#/topics/rustutors-2026-2027-oge7-topic1');await page.getByRole('link',{name:'Интерактив: буква и правило'}).click();await page.getByRole('button',{name:'Разобрать 5 примеров'}).click();await expect(page.getByRole('heading',{name:'Пример 1 из 5'})).toBeVisible();
  const saved=()=>expect(page.getByRole('status',{name:'Сохранение интерактива'})).toHaveText('Черновик сохранён');
  const letter=page.getByRole('combobox',{name:'Пропущенная буква'});

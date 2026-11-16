@@ -1,3 +1,4 @@
+import type {PunctuationSession} from './punctuation';
 import type {LearningSession} from './interactive';
 import {z} from 'zod';
 export const BlockSchema = z.discriminatedUnion('type',[
@@ -41,4 +42,4 @@ export type Result='correct'|'wrong'|'skipped'|'self';
 export type Mode='practice'|'timed'|'review'|'diagnostic'|'spaced';
 export interface Attempt {id:string;sessionId:string;taskId:string;taskVersion:number;answer:Answer;result:Result;incomplete:boolean;checkedAt:number;localDay?:string;hintUsed?:boolean;mode:Mode;packId:string;packVersion:string}
 export interface Session {id:string;packId:string;packVersion:string;mode:Mode;taskIds:string[];position:number;drafts:Record<string,Answer>;results:Record<string,Attempt>;status:'active'|'completed';startedAt:number;endsAt?:number;finishedAt?:number}
-export interface State {pack:ContentPack;attempts:Attempt[];sessions:Session[];active:Session|null;learningSessions:LearningSession[];activeLearning:LearningSession|null;theme:'system'|'light'|'dark'}
+export interface State {pack:ContentPack;attempts:Attempt[];sessions:Session[];active:Session|null;learningSessions:LearningSession[];activeLearning:LearningSession|null;punctuationSessions:PunctuationSession[];activePunctuation:PunctuationSession|null;theme:'system'|'light'|'dark'}

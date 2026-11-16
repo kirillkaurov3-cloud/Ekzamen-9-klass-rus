@@ -1,3 +1,4 @@
+import {PunctuationIntro} from './PunctuationPage';
 import {useEffect,useRef,useState} from 'react';
 import {Link,useNavigate} from 'react-router-dom';
 import {ArrowRight,Check,Lightbulb} from 'lucide-react';
@@ -22,13 +23,13 @@ export function InteractiveStats({state}:{state:State}) {
 export function Workshop({state,run}:{state:State;run:Run}) {
  const navigate=useNavigate();
  const exercises=letterExercises(state.pack);
- return <div className="reading"><h1>Мастерская правил</h1><p className="muted">Объясни свой выбор на конкретном слове.</p>
+ return <div className="reading"><h1>Мастерская правил</h1><p className="muted">Выбери упражнение и объясни свой ответ.</p>
   <section className="card"><span className="badge">ОГЭ № 7</span><h2 style={{marginTop:20}}>Буква и правило</h2>
    <p>Вставь букву, затем выбери объяснение. Пять примеров из таблицы разбора: корень или окончание, проверяемая гласная или словарное слово.</p>
    {exercises.length?<button className="button" onClick={()=>void run(store.startLetters()).then(next=>{if(next)navigate('/workshop/letters');})}>{state.activeLearning?'Продолжить интерактив':'Разобрать 5 примеров'} <ArrowRight size={16}/></button>:<><p>Примеры связаны с пособием. Открой его в библиотеке — после загрузки мастерская работает и без сети.</p><Link className="button" to="/library">Открыть пособие <ArrowRight size={16}/></Link></>}
    <p className="progress-note">Проверены пять строк задания 57: условие — страница 285, таблица ключа — 512. Пояснения и подсказки написаны для приложения по этой таблице.</p>
   </section>
-  {exercises.length>0&&<InteractiveStats state={state}/>}
+  <PunctuationIntro state={state} run={run}/>{exercises.length>0&&<InteractiveStats state={state}/>}
  </div>;
 }
 export function LettersPage({state,run}:{state:State;run:Run}) {

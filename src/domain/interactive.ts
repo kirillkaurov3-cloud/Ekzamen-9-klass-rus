@@ -39,6 +39,7 @@ export interface LearningSession {
  results:Record<string,LearningAttempt>;
  status:'active'|'completed';
  startedAt:number;
+ lastOpenedAt?:number;
  finishedAt?:number;
 }
 
