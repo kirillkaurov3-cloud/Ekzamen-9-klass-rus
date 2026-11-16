@@ -1,6 +1,8 @@
+import {buildLessonActivities,buildCardActivities,LESSON_TITLES} from '../content/studyLessons';
 import type {Answer,Attempt,ContentPack} from './schema';
-import {check} from './engine';
-import {addDays,localDay,REPETITION_INTERVALS} from './repetition';
+import {check,currentAttempts} from './engine';
+import {isAssessable} from './learning';
+import {addDays,localDay,REPETITION_INTERVALS,dueRepetitions} from './repetition';
 
 export type StudyMode='grammar'|'reason'|'lesson'|'cards'|'daily';
 export type GrammarRole='subject'|'predicate'|'main';
@@ -65,7 +67,8 @@ export const GRAMMAR_ACTIVITIES:StudyActivity[]=[
  grammar(4,'В этих нишах, напоминающих зелёные гнёздышки, хотелось отдохнуть.',[{phrase:'хотелось отдохнуть',role:'main'}],'Это односоставное безличное предложение. Единственный главный член — «хотелось отдохнуть»: модальное значение и действие выражены вместе. Подлежащего нет. «В этих нишах» — обстоятельство места.','Не добавляй воображаемое подлежащее. Выбери инструмент для единственного главного члена и отметь оба слова.'),
  grammar(5,'Вообще садовник хорошо знал своё дело: зимой у него расцветали камелии, ранней весной радовали глаз тюльпаны и гиацинты.',[{phrase:'садовник',role:'subject'},{phrase:'знал своё дело',role:'predicate'},{phrase:'камелии',role:'subject'},{phrase:'расцветали',role:'predicate'},{phrase:'тюльпаны',role:'subject'},{phrase:'гиацинты',role:'subject'},{phrase:'радовали глаз',role:'predicate'}],'В ключе три основы: «садовник знал своё дело», «камелии расцветали», «тюльпаны и гиацинты радовали глаз». Сочетания «знал своё дело» и «радовали глаз» включаем в сказуемые целиком, как в разборе пособия. Союз между подлежащими не отмечаем.','Найди три сообщения: о садовнике, камелиях, тюльпанах и гиацинтах. Сказуемое может состоять из устойчивого сочетания.')
 ];
-const repair=(n:number,word:string,prompt:string,correct:string,wrong1:string,wrong2:string,example:string,badExample:string,explanation:string):StudyActivity=>({id:`reason.root.${n}`,version:1,mode:'reason',kind:'repair',title:`Исправь рассуждение: ${word}`,instruction:'В исходном объяснении есть ошибка. Выбери исправление, затем пример, который подтверждает правило.',prompt,choices:[{id:'wrong-a',text:wrong1},{id:'right',text:correct},{id:'wrong-b',text:wrong2}],key:'right',examples:[{id:'not-proof',text:badExample},{id:'proof',text:example}],exampleKey:'proof',explanation,hint:'Определи тип гласной в корне: проверяемая, непроверяемая или чередующаяся. Затем проверь, какое условие действительно выбирает букву.',sourceTaskId:`rustutors-2026-2027-oge6-topic1-q${n}`,sourceTaskVersion:1,independent:true});
+const rotate=<T>(items:T[],offset:number)=>[...items.slice(offset),...items.slice(0,offset)];
+const repair=(n:number,word:string,prompt:string,correct:string,wrong1:string,wrong2:string,example:string,badExample:string,explanation:string):StudyActivity=>({id:`reason.root.${n}`,version:1,mode:'reason',kind:'repair',title:`Исправь рассуждение: ${word}`,instruction:'В исходном объяснении есть ошибка. Выбери исправление, затем пример, который подтверждает правило.',prompt,choices:rotate([{id:'wrong-a',text:wrong1},{id:'right',text:correct},{id:'wrong-b',text:wrong2}],(n-1)%3),key:'right',examples:rotate([{id:'not-proof',text:badExample},{id:'proof',text:example}],(n-1)%2),exampleKey:'proof',explanation,hint:'Определи тип гласной в корне: проверяемая, непроверяемая или чередующаяся. Затем проверь, какое условие действительно выбирает букву.',sourceTaskId:`rustutors-2026-2027-oge6-topic1-q${n}`,sourceTaskVersion:1,independent:true});
 export const REASON_ACTIVITIES:StudyActivity[]=[
  repair(1,'УКРОЩАТЬ','УКРОЩАТЬ (животных) — в корне слова пишется непроверяемая гласная.','Гласная проверяемая: проверочное слово кро́ткий.','Это чередование, выбор зависит от суффикса -а-.','Написание зависит только от согласной Щ.','Укрощать — кро́ткий: проверяемая О стоит под ударением.','Укрощать — укроти́ть: нужная О по-прежнему без ударения.','Ошибка — отнесение гласной к непроверяемым. В ключе дано «укрощать — кроткий». Ударная О в слове «кро́ткий» проверяет безударную гласную.'),
  repair(2,'СКАКАТЬ','СКАКАТЬ — написание безударной чередующейся гласной в корне зависит от суффикса -А-.','В -скак-/-скоч- выбор зависит от конечной согласной корня: перед К — А, перед Ч — О, с учётом исключений.','Для всех слов с этим корнем достаточно найти ударную гласную.','Написание корня всегда словарное.','Скака́ть — вы́скочить: К/Ч в конце корня определяет выбор А/О.','Скака́ть — скака́ть: повтор того же слова не показывает условие выбора.','Ошибка — неверное условие чередования. У «скакать» корень заканчивается на К, поэтому пишется А. Суффикс -а- не выбирает здесь гласную.'),
@@ -78,28 +81,74 @@ export function sourceEligible(pack:ContentPack,activity:StudyActivity) {
  return pack.source.checksum==='f6ed218ac5b38133e1042d34cabd6cc13ce63b837dd6f4696c5dac85267bf127'&&pack.tasks.some(t=>t.id===activity.sourceTaskId&&t.version===activity.sourceTaskVersion&&t.verification==='manual'&&!t.reviewRequired&&t.type!=='self');
 }
 export function studyActivities(pack:ContentPack):StudyActivity[]{
- return [...GRAMMAR_ACTIVITIES,...REASON_ACTIVITIES].filter(a=>sourceEligible(pack,a)).filter(a=>{
-  if(a.kind!=='tokens'||a.origin==='author')return true;
+ const grammar=GRAMMAR_ACTIVITIES.filter(a=>sourceEligible(pack,a)).filter(a=>{
   const task=pack.tasks.find(t=>t.id===a.sourceTaskId),text=pack.texts.find(t=>t.id===task?.textId);
   return text?.blocks.some(b=>'text' in b&&b.text.includes(a.prompt));
- }).map(a=>a.kind==='repair'?{...a,prompt:pack.tasks.find(t=>t.id===a.sourceTaskId)!.prompt.slice(1).flatMap(b=>'text' in b?[b.text]:[]).join('\n')}:a);
+ });
+ return [...grammar,...REASON_ACTIVITIES.filter(a=>sourceEligible(pack,a)),...buildLessonActivities(grammar),...buildCardActivities(grammar)]
+  .map(a=>a.kind==='repair'?{...a,prompt:pack.tasks.find(t=>t.id===a.sourceTaskId)!.prompt.slice(1).flatMap(b=>'text' in b?[b.text]:[]).join('\n')}:a);
 }
-export function resolveStudy(pack:ContentPack,id:string){return studyActivities(pack).find(a=>a.id===id);}
-export function studyPlan(pack:ContentPack,mode:StudyMode,_sessions:StudySession[]=[],_attempts:Attempt[]=[],_day=localDay(),lessonId?:string):StudyActivity[]{
- void _sessions;void _attempts;void _day;
- return studyActivities(pack).filter(a=>a.mode===mode&&(!lessonId||a.lessonId===lessonId));
+export function resolveStudy(pack:ContentPack,id:string):StudyActivity|undefined {
+ const dynamic=/^daily\.(\d{4}-\d{2}-\d{2})\.(practice|spaced|rule|worked)\.(.+)$/.exec(id);
+ if(!dynamic)return studyActivities(pack).find(a=>a.id===id);
+ let taskId:string;try{taskId=decodeURIComponent(dynamic[3]);}catch{return undefined;}
+ const task=pack.tasks.find(t=>t.id===taskId&&isAssessable(t));if(!task)return undefined;
+ const read=dynamic[2]==='rule'||dynamic[2]==='worked';
+ const text=(blocks:typeof task.prompt)=>blocks.flatMap(b=>'text' in b?[b.text]:[]).join('\n');
+ const explanation=text(task.explanation);
+ return {id,version:task.version,mode:'daily',kind:read?'read':'ordinary',sourceTaskId:task.id,sourceTaskVersion:task.version,independent:!read,
+  title:dynamic[2]==='rule'?'Короткое правило':dynamic[2]==='worked'?'Разобранный пример':`ОГЭ № ${task.oge} · ${dynamic[2]==='spaced'?'Повторение по сроку':'Самостоятельная практика'}`,
+  instruction:read?'Прочитай разбор. Следующие вопросы решишь самостоятельно.':'Выполни исходное задание и проверь ответ.',
+  prompt:dynamic[2]==='rule'?'Грамматическая основа сообщает, о чём или о ком говорится и что происходит. Обстоятельства места и времени в основу не входят.':dynamic[2]==='worked'?'«Над рекой поднимался туман». Основа — «туман поднимался»: что поднималось? Туман. «Над рекой» — обстоятельство места.':'',
+  explanation:read?'':explanation,hint:read?'':pack.theory.find(t=>pack.topics.some(topic=>task.topicIds.includes(topic.id)&&topic.theoryIds.includes(t.id)))?.blocks.flatMap(b=>'text' in b?[b.text]:[]).join('\n').slice(0,1200)||'Раздели условие на шаги и проверь своё решение по правилу темы.',
+  origin:read?'author':'source',...(!read?{canonicalMode:dynamic[2] as 'practice'|'spaced'}:{})};
 }
+const dailyId=(day:string,phase:string,id:string)=>`daily.${day}.${phase}.${encodeURIComponent(id)}`;
+export function dailyStudyPlan(pack:ContentPack,sessions:StudySession[],attempts:Attempt[],day=localDay()):StudyActivity[] {
+ if(sessions.some(s=>s.packId===pack.packId&&s.mode==='daily'&&s.day===day&&s.status==='completed'&&validStudySession(pack,s)))return [];
+ const activities=studyActivities(pack),cards=studyCardSchedule(pack,sessions).filter(c=>c.due<=day).slice(0,5).flatMap(c=>activities.find(a=>a.id===c.id)??[]);
+ const due=dueRepetitions(pack,attempts,day).slice(0,5-cards.length).flatMap(c=>resolveStudy(pack,dailyId(day,'spaced',c.taskId))??[]);
+ const lessons=studyPlan(pack,'lesson',sessions,attempts,day);
+ const reviewed=new Set([...cards,...due,...lessons].map(a=>a.sourceTaskId));
+ const history=currentAttempts(pack,attempts),seen=new Map(history.map(a=>[a.taskId,a]));
+ const candidates=pack.tasks.filter(t=>isAssessable(t)&&!reviewed.has(t.id)).sort((a,b)=>{
+  const rank=(id:string)=>seen.get(id)?.result==='wrong'?0:!seen.has(id)?1:2;
+  return rank(a.id)-rank(b.id)||Number(b.verification==='manual')-Number(a.verification==='manual')||a.oge-b.oge;
+ });
+ // Prefer two different OGE numbers, keeping the plan deterministic.
+ const first=candidates[0],second=candidates.find(t=>t.oge!==first?.oge)??candidates[1];
+ const practice=[first,second].filter((t):t is NonNullable<typeof t>=>!!t).flatMap(t=>resolveStudy(pack,dailyId(day,'practice',t.id))??[]);
+ const fallback=lessons.length?[]:['rule','worked'].flatMap(phase=>first?resolveStudy(pack,dailyId(day,phase,first.id))??[]:[]);
+ return [...cards,...due,...(lessons.length?lessons:fallback),...practice];
+}
+export function studyPlan(pack:ContentPack,mode:StudyMode,sessions:StudySession[]=[],attempts:Attempt[]=[],day=localDay(),lessonId?:string):StudyActivity[]{
+ if(mode==='daily')return dailyStudyPlan(pack,sessions,attempts,day);
+ const activities=studyActivities(pack).filter(a=>a.mode===mode);
+ if(mode==='lesson'){
+  const ids=[...new Set(activities.map(a=>a.lessonId).filter((id):id is string=>!!id))];
+  const completed=new Set(sessions.filter(s=>s.packId===pack.packId&&s.status==='completed'&&validStudySession(pack,s)).map(s=>s.lessonId));
+  const selected=lessonId??ids.find(id=>!completed.has(id))??ids[0];
+  return activities.filter(a=>a.lessonId===selected);
+ }
+ if(mode==='cards'){
+  const schedule=studyCardSchedule(pack,sessions),due=new Set(schedule.filter(c=>c.due<=day).map(c=>c.id)),seen=new Set(schedule.map(c=>c.id));
+  const overdue=schedule.filter(c=>due.has(c.id)).flatMap(c=>activities.find(a=>a.id===c.id)??[]);
+  return [...overdue,...activities.filter(a=>!seen.has(a.id))].slice(0,5);
+ }
+ return activities;
+}
+export function studySessionTitle(session:StudySession){return session.mode==='lesson'&&session.lessonId?LESSON_TITLES[Number(session.lessonId.split('.').at(-1))-1]??STUDY_LABELS.lesson:STUDY_LABELS[session.mode];}
 export function currentStudyAttempts(pack:ContentPack,sessions:StudySession[]) {
- return sessions.filter(s=>s.packId===pack.packId).flatMap(s=>Object.values(s.results)).filter(a=>{const current=resolveStudy(pack,a.activityId);return current?.version===a.activityVersion&&current.sourceTaskId===a.taskId&&current.sourceTaskVersion===a.taskVersion;});
+ const activities=new Map(studyActivities(pack).map(a=>[a.id,a]));return sessions.filter(s=>s.packId===pack.packId).flatMap(s=>Object.values(s.results)).filter(a=>{const current=activities.get(a.activityId)??resolveStudy(pack,a.activityId);return current?.version===a.activityVersion&&current.sourceTaskId===a.taskId&&current.sourceTaskVersion===a.taskVersion;});
 }
 export function validStudySession(pack:ContentPack,session:StudySession){return session.plan.length>0&&session.plan.every(id=>resolveStudy(pack,id)?.version===session.versions[id]);}
 export const STUDY_LABELS:Record<StudyMode,string>={grammar:'Основа предложения',reason:'Исправление рассуждения',lesson:'Короткий урок',cards:'Карточки',daily:'Тренировка на сегодня'};
 
 export function studyCardSchedule(pack:ContentPack,sessions:StudySession[]) {
  const cards=new Map<string,{id:string;step:number;due:string;lastDay:string;self:boolean}>(),seen=new Set<string>();
- for(const a of currentStudyAttempts(pack,sessions).filter(a=>a.mode==='cards').sort((a,b)=>a.checkedAt-b.checkedAt||a.id.localeCompare(b.id))){
+ for(const a of currentStudyAttempts(pack,sessions).filter(a=>a.activityId.startsWith('cards.')).sort((a,b)=>a.checkedAt-b.checkedAt||a.id.localeCompare(b.id))){
   if(seen.has(a.id))continue;seen.add(a.id);const previous=cards.get(a.activityId);const success=a.kind==='self'?a.answer.rating===2:a.correct===true;
-  if(!previous||!success||!a.independent){cards.set(a.activityId,{id:a.activityId,step:0,due:addDays(a.localDay,1),lastDay:a.localDay,self:a.kind==='self'});continue;}
+  if(!previous||!success||a.answer.hintUsed||a.kind!=='self'&&!a.independent){cards.set(a.activityId,{id:a.activityId,step:0,due:addDays(a.localDay,1),lastDay:a.localDay,self:a.kind==='self'});continue;}
   if(a.localDay>=previous.due&&a.localDay>previous.lastDay){const step=Math.min(3,previous.step+1);cards.set(a.activityId,{...previous,step,due:addDays(a.localDay,REPETITION_INTERVALS[step]),lastDay:a.localDay});}
  }
  return [...cards.values()].sort((a,b)=>a.due.localeCompare(b.due)||a.id.localeCompare(b.id));

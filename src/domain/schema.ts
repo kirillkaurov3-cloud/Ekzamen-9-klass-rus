@@ -42,5 +42,5 @@ export type Answer=string|string[]|Record<string,string>;
 export type Result='correct'|'wrong'|'skipped'|'self';
 export type Mode='practice'|'timed'|'review'|'diagnostic'|'spaced';
 export interface Attempt {id:string;sessionId:string;taskId:string;taskVersion:number;answer:Answer;result:Result;incomplete:boolean;checkedAt:number;localDay?:string;hintUsed?:boolean;mode:Mode;packId:string;packVersion:string}
-export interface Session {id:string;packId:string;packVersion:string;mode:Mode;taskIds:string[];position:number;drafts:Record<string,Answer>;results:Record<string,Attempt>;status:'active'|'completed';startedAt:number;endsAt?:number;finishedAt?:number}
+export interface Session {id:string;packId:string;packVersion:string;mode:Mode;taskIds:string[];position:number;drafts:Record<string,Answer>;results:Record<string,Attempt>;status:'active'|'completed';startedAt:number;endsAt?:number;finishedAt?:number;helped?:string[]}
 export interface State {pack:ContentPack;attempts:Attempt[];sessions:Session[];active:Session|null;learningSessions:LearningSession[];activeLearning:LearningSession|null;punctuationSessions:PunctuationSession[];activePunctuation:PunctuationSession|null;studySessions:StudySession[];activeStudy:StudySession|null;theme:'system'|'light'|'dark'}

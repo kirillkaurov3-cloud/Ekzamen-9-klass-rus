@@ -104,3 +104,8 @@ it('restores a fixed due plan offline, saves its day and advances a repetition o
  await Promise.all([store.checkCurrent(),store.checkCurrent()]);const final=await store.finishSession();expect(final.attempts.filter(a=>a.mode==='spaced')).toHaveLength(1);expect(final.attempts.at(-1)?.localDay).toBe('2026-11-02');
  const {repetitionSchedule}=await import('../src/domain/repetition');expect(repetitionSchedule(p,final.attempts)[0]).toMatchObject({dueDay:'2026-11-05',step:1});
 });
+
+it('persists assistance for ordinary practice but leaves sealed and checked attempts unchanged',async()=>{
+ const p=pack();await store.importPack(p);await store.startSession([p.tasks[0].id],'practice',1);await store.markTaskHelp(p.tasks[0].id);await store.saveDraft(p.tasks[0].id,['1','12']);let state=await store.checkCurrent();expect(state.attempts[0].hintUsed).toBe(true);await store.finishSession();
+ await store.startSession([p.tasks[0].id],'timed',1);await store.markTaskHelp(p.tasks[0].id);await store.saveDraft(p.tasks[0].id,['1','12']);state=await store.finishSession();expect(state.attempts.at(-1)?.hintUsed).toBe(false);await store.markTaskHelp(p.tasks[0].id);expect((await store.loadState()).attempts).toEqual(state.attempts);
+});
