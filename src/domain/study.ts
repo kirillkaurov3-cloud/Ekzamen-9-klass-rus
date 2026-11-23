@@ -1,4 +1,5 @@
 import {buildLessonActivities,buildCardActivities,LESSON_TITLES} from '../content/studyLessons';
+import {MORE_REASON_ACTIVITIES,REASON_INSTRUCTION,type ReasonActivity} from '../content/studyReasoning';
 import type {Answer,Attempt,ContentPack} from './schema';
 import {check,currentAttempts} from './engine';
 import {isAssessable} from './learning';
@@ -68,13 +69,17 @@ export const GRAMMAR_ACTIVITIES:StudyActivity[]=[
  grammar(5,'Вообще садовник хорошо знал своё дело: зимой у него расцветали камелии, ранней весной радовали глаз тюльпаны и гиацинты.',[{phrase:'садовник',role:'subject'},{phrase:'знал своё дело',role:'predicate'},{phrase:'камелии',role:'subject'},{phrase:'расцветали',role:'predicate'},{phrase:'тюльпаны',role:'subject'},{phrase:'гиацинты',role:'subject'},{phrase:'радовали глаз',role:'predicate'}],'В ключе три основы: «садовник знал своё дело», «камелии расцветали», «тюльпаны и гиацинты радовали глаз». Сочетания «знал своё дело» и «радовали глаз» включаем в сказуемые целиком, как в разборе пособия. Союз между подлежащими не отмечаем.','Найди три сообщения: о садовнике, камелиях, тюльпанах и гиацинтах. Сказуемое может состоять из устойчивого сочетания.')
 ];
 const rotate=<T>(items:T[],offset:number)=>[...items.slice(offset),...items.slice(0,offset)];
-const repair=(n:number,word:string,prompt:string,correct:string,wrong1:string,wrong2:string,example:string,badExample:string,explanation:string):StudyActivity=>({id:`reason.root.${n}`,version:1,mode:'reason',kind:'repair',title:`Исправь рассуждение: ${word}`,instruction:'В исходном объяснении есть ошибка. Выбери исправление, затем пример, который подтверждает правило.',prompt,choices:rotate([{id:'wrong-a',text:wrong1},{id:'right',text:correct},{id:'wrong-b',text:wrong2}],(n-1)%3),key:'right',examples:rotate([{id:'not-proof',text:badExample},{id:'proof',text:example}],(n-1)%2),exampleKey:'proof',explanation,hint:'Определи тип гласной в корне: проверяемая, непроверяемая или чередующаяся. Затем проверь, какое условие действительно выбирает букву.',sourceTaskId:`rustutors-2026-2027-oge6-topic1-q${n}`,sourceTaskVersion:1,independent:true});
-export const REASON_ACTIVITIES:StudyActivity[]=[
+const repair=(n:number,word:string,prompt:string,correct:string,wrong1:string,wrong2:string,example:string,badExample:string,explanation:string):ReasonActivity=>({id:`reason.root.${n}`,version:1,mode:'reason',kind:'repair',title:`Проверь рассуждение: ${word}`,instruction:REASON_INSTRUCTION,prompt,choices:rotate([{id:'wrong-a',text:wrong1},{id:'right',text:correct},{id:'wrong-b',text:wrong2}],(n-1)%3),key:'right',examples:rotate([{id:'not-proof',text:badExample},{id:'proof',text:example}],(n-1)%2),exampleKey:'proof',explanation,hint:'Определи тип гласной в корне: проверяемая, непроверяемая или чередующаяся. Затем проверь, какое условие действительно выбирает букву.',sourceTaskId:`rustutors-2026-2027-oge6-topic1-q${n}`,sourceTaskVersion:1,sourceKey:'false',independent:true});
+const ROOT_REASON_ACTIVITIES:ReasonActivity[]=[
  repair(1,'УКРОЩАТЬ','УКРОЩАТЬ (животных) — в корне слова пишется непроверяемая гласная.','Гласная проверяемая: проверочное слово кро́ткий.','Это чередование, выбор зависит от суффикса -а-.','Написание зависит только от согласной Щ.','Укрощать — кро́ткий: проверяемая О стоит под ударением.','Укрощать — укроти́ть: нужная О по-прежнему без ударения.','Ошибка — отнесение гласной к непроверяемым. В ключе дано «укрощать — кроткий». Ударная О в слове «кро́ткий» проверяет безударную гласную.'),
  repair(2,'СКАКАТЬ','СКАКАТЬ — написание безударной чередующейся гласной в корне зависит от суффикса -А-.','В -скак-/-скоч- выбор зависит от конечной согласной корня: перед К — А, перед Ч — О, с учётом исключений.','Для всех слов с этим корнем достаточно найти ударную гласную.','Написание корня всегда словарное.','Скака́ть — вы́скочить: К/Ч в конце корня определяет выбор А/О.','Скака́ть — скака́ть: повтор того же слова не показывает условие выбора.','Ошибка — неверное условие чередования. У «скакать» корень заканчивается на К, поэтому пишется А. Суффикс -а- не выбирает здесь гласную.'),
  repair(3,'БЛЕСТИТ','БЛЕСТИТ — написание безударной чередующейся гласной в корне зависит от последующих согласных.','В -блест-/-блист- перед суффиксом -а- пишется И, без него — Е.','Любая гласная в этом корне проверяется словом «блеск».','Всегда пишется И после сочетания БЛ.','Блестит — блистает: при появлении суффикса -а- меняется гласная корня.','Блестит — блеск: ударение не является условием этого чередования.','В ключе указано условие: наличие или отсутствие суффикса А после корня. В «блестит» его нет, поэтому Е; в «блистает» есть, поэтому И.'),
  repair(4,'СНИМАТЬ','СНИМАТЬ (кино) — написание безударной чередующейся гласной в корне зависит от места ударения.','Чередование -им-/-а-(-я-) определяется суффиксом -а- после корня.','Корень в этом слове непроверяемый.','Гласная всегда выбирается по конечной согласной корня.','Снимать — снять: в «снимать» после корня есть суффикс -а-.','Снимать — снима́ть: указание ударения не объясняет выбор ИМ.','Ошибка — ссылка на ударение. В ключе назван суффикс -а-. В паре «снимать — снять» видно чередование; написание ИМ связано с этим суффиксом.'),
  repair(5,'БЛЕСТЯЩИЙ','БЛЕСТЯЩИЙ — написание безударной гласной в корне проверяется словом «блеск».','Это чередование -блест-/-блист-: без суффикса -а- после корня пишется Е.','Это непроверяемая гласная, правило не применяется.','Выбор Е зависит от ударения в слове «блеск».','Блестящий — блистающий: сравни наличие суффикса -а- после корня.','Блестящий — блеск: ударение подменяет условие чередования.','Ошибка — применение проверочного слова к чередующемуся корню. В «блестящий» нет суффикса -а- после корня; Е объясняется правилом чередования, а не словом «блеск».')
+];
+export const REASON_ACTIVITIES = [
+ ...ROOT_REASON_ACTIVITIES.flatMap((activity,index)=>[activity,...MORE_REASON_ACTIVITIES.slice(index,index+1)]),
+ ...MORE_REASON_ACTIVITIES.slice(ROOT_REASON_ACTIVITIES.length),
 ];
 export function sourceEligible(pack:ContentPack,activity:StudyActivity) {
  if(activity.sourceTaskId.startsWith('demo-'))return pack.demo&&pack.tasks.some(t=>t.id===activity.sourceTaskId&&t.version===activity.sourceTaskVersion);
@@ -85,8 +90,14 @@ export function studyActivities(pack:ContentPack):StudyActivity[]{
   const task=pack.tasks.find(t=>t.id===a.sourceTaskId),text=pack.texts.find(t=>t.id===task?.textId);
   return text?.blocks.some(b=>'text' in b&&b.text.includes(a.prompt));
  });
- return [...grammar,...REASON_ACTIVITIES.filter(a=>sourceEligible(pack,a)),...buildLessonActivities(grammar),...buildCardActivities(grammar)]
-  .map(a=>a.kind==='repair'?{...a,prompt:pack.tasks.find(t=>t.id===a.sourceTaskId)!.prompt.slice(1).flatMap(b=>'text' in b?[b.text]:[]).join('\n')}:a);
+ const reasons=REASON_ACTIVITIES.flatMap(activity=>{
+  if(!sourceEligible(pack,activity))return [];
+  const task=pack.tasks.find(t=>t.id===activity.sourceTaskId&&t.version===activity.sourceTaskVersion);
+  if(task?.type!=='boolean'||task.key!==activity.sourceKey)return [];
+  const prompt=task.prompt.slice(1).flatMap(block=>'text' in block?[block.text]:[]).join('\n');
+  return prompt?[{...activity,prompt}]:[];
+ });
+ return [...grammar,...reasons,...buildLessonActivities(grammar),...buildCardActivities(grammar)];
 }
 export function resolveStudy(pack:ContentPack,id:string):StudyActivity|undefined {
  const dynamic=/^daily\.(\d{4}-\d{2}-\d{2})\.(practice|spaced|rule|worked)\.(.+)$/.exec(id);
@@ -134,6 +145,18 @@ export function studyPlan(pack:ContentPack,mode:StudyMode,sessions:StudySession[
   const schedule=studyCardSchedule(pack,sessions),due=new Set(schedule.filter(c=>c.due<=day).map(c=>c.id)),seen=new Set(schedule.map(c=>c.id));
   const overdue=schedule.filter(c=>due.has(c.id)).flatMap(c=>activities.find(a=>a.id===c.id)??[]);
   return [...overdue,...activities.filter(a=>!seen.has(a.id))].slice(0,5);
+ }
+ if(mode==='reason'){
+  const completedSteps=new Map<string,number>();
+  for(const session of sessions){
+   if(session.packId!==pack.packId||session.mode!==mode||session.status!=='completed')continue;
+   for(const activity of activities){
+    if(session.versions[activity.id]!==activity.version||!session.results[activity.id])continue;
+    completedSteps.set(activity.id,(completedSteps.get(activity.id)??0)+1);
+   }
+  }
+  const count=(activity:StudyActivity)=>completedSteps.get(activity.id)??0;
+  return activities.sort((first,second)=>count(first)-count(second)).slice(0,5);
  }
  return activities;
 }

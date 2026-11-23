@@ -3,7 +3,7 @@ import Dexie from 'dexie';
 import {readFileSync} from 'node:fs';
 import {afterAll,beforeEach,expect,it,vi} from 'vitest';
 import {ContentPackSchema} from '../src/domain/schema';
-import {emptyStudyDraft,expectedRoles,gradeStudy,studyActivities,studyPlan,wordTokens,currentStudyAttempts} from '../src/domain/study';
+import {emptyStudyDraft,expectedRoles,gradeStudy,studyActivities,studyPlan,wordTokens,currentStudyAttempts,REASON_ACTIVITIES} from '../src/domain/study';
 import {stats} from '../src/domain/engine';
 import {workshopResume} from '../src/domain/workshop';
 import {punctuationExercises,type PunctuationSession} from '../src/domain/punctuation';
@@ -31,19 +31,46 @@ it('detects extra words, missing words and incorrect roles instead of accepting 
  expect(gradeStudy(a,{...emptyStudyDraft(),roles:{...roles,[extra]:'subject'}},book).correct).toBe(false);
  const wrong=Object.fromEntries(Object.keys(expectedRoles(single)).map(id=>[id,'predicate' as const]));expect(gradeStudy(single,{...emptyStudyDraft(),roles:wrong},book).correct).toBe(false);
 });
-it('uses five actual false assertions and independently checks repair and confirming example',()=>{
- const activities=studyPlan(book,'reason');expect(activities).toHaveLength(5);expect(new Set(activities.map(a=>a.sourceTaskId)).size).toBe(5);
+it('uses ten checked assertions and independently checks reasoning and the confirming example',()=>{
+ const activities=studyActivities(book).filter(a=>a.mode==='reason');
+ expect(activities).toHaveLength(10);
+ expect(new Set(activities.map(a=>a.sourceTaskId)).size).toBe(10);
+ expect(REASON_ACTIVITIES.filter(a=>a.sourceKey==='true')).toHaveLength(4);
+ const firstPlan=studyPlan(book,'reason');
+ expect(firstPlan).toHaveLength(5);
+ expect(firstPlan.map(a=>book.tasks.find(t=>t.id===a.sourceTaskId)?.key)).toEqual(['false','true','false','true','false']);
  for(const a of activities){
-  const task=book.tasks.find(t=>t.id===a.sourceTaskId)!;expect(task.key).toBe('false');expect(task.verification).toBe('manual');expect(task.source.pages).toContain(212);expect(task.source.answerPages).toContain(460);
+  const task=book.tasks.find(t=>t.id===a.sourceTaskId)!;
+  expect(task.key).toBe(REASON_ACTIVITIES.find(candidate=>candidate.id===a.id)?.sourceKey);
+  expect(task.verification).toBe('manual');
+  expect(task.version).toBe(a.sourceTaskVersion);
   expect(a.prompt).toBe(task.prompt.slice(1).flatMap(b=>'text' in b?[b.text]:[]).join('\n'));
   expect(gradeStudy(a,{...emptyStudyDraft(),choice:a.key!},book)).toMatchObject({complete:false});
   expect(gradeStudy(a,{...emptyStudyDraft(),choice:a.key!,example:'not-proof'},book)).toEqual({correct:false,complete:true});
   expect(gradeStudy(a,{...emptyStudyDraft(),choice:a.key!,example:a.exampleKey!},book)).toEqual({correct:true,complete:true});
  }
 });
+it('keeps a saved five-step reasoning plan and draft from before the new exercises',async()=>{
+ await store.importPack(book);
+ const original=REASON_ACTIVITIES.filter(a=>a.id.startsWith('reason.root.'));
+ const current=(await store.startStudy('reason')).activeStudy!;
+ const legacy={
+  ...current,
+  plan:original.map(a=>a.id),
+  versions:Object.fromEntries(original.map(a=>[a.id,a.version])),
+  position:1,
+  drafts:{[original[1].id]:{...emptyStudyDraft(),choice:'right',hintUsed:true}},
+ };
+ await store.db.studySessions.put(legacy);
+ const resumed=(await store.startStudy('reason')).activeStudy!;
+ expect(resumed).toMatchObject({id:legacy.id,plan:legacy.plan,position:legacy.position,drafts:legacy.drafts});
+});
 it('does not expose a changed edition or a source sentence that no longer matches the annotation',()=>{
  expect(studyActivities({...book,source:{...book.source,checksum:'wrong'}})).toEqual([]);
  const changed={...book,texts:book.texts.map(t=>({...t,blocks:[]}))};expect(studyPlan(changed,'grammar')).toEqual([]);expect(studyPlan(changed,'reason')).toHaveLength(5);
+ const example=REASON_ACTIVITIES.find(a=>a.sourceKey==='true')!;
+ const altered={...book,tasks:book.tasks.map(t=>t.id===example.sourceTaskId?{...t,key:'false'}:t)};
+ expect(studyActivities(altered).map(a=>a.id)).not.toContain(example.id);
 });
 it('restores two drafts, preserves help, and resumes the most recently opened mode',async()=>{
  await store.importPack(book);vi.spyOn(Date,'now').mockReturnValue(1000);let state=await store.startStudy('grammar');const grammar=studyPlan(book,'grammar')[0],id=state.activeStudy!.id;

@@ -3,6 +3,7 @@ import {ArrowRight} from 'lucide-react';
 import type {State} from '../domain/schema';
 import {studyActivities,studyPlan,studyCardSchedule,validStudySession,STUDY_LABELS,type StudyMode} from '../domain/study';
 import {LESSON_TITLES} from '../content/studyLessons';
+import {REASON_INSTRUCTION} from '../content/studyReasoning';
 import {plural} from '../domain/format';
 import {useLocalDay} from './RepetitionPage';
 import type {StudyRun} from './StudyPage';
@@ -12,7 +13,7 @@ export const LEARNING_MODES:StudyMode[]=['grammar','reason','lesson','cards'];
 const activeFor=(state:State,mode:StudyMode)=>state.studySessions.find(s=>s.mode===mode&&s.status==='active'&&validStudySession(state.pack,s));
 export function StudyHubs({state,run}:{state:State;run:StudyRun}) {
  const navigate=useNavigate(),day=useLocalDay();
- const descriptions:Record<StudyMode,string>={grammar:'Выдели слова выбранным инструментом. Найди подлежащие, сказуемые или единственный главный член.',reason:'Исправь ошибочное объяснение, затем выбери пример, который подтверждает правило.',lesson:'Короткие серии: правило, разобранный пример, шаг с подсказкой и два самостоятельных задания.',cards:'Вспомни основу или объясни правило. Проверяемые ответы и самооценка учитываются отдельно.',daily:'Повторение по сроку, короткий урок и самостоятельная практика.'};
+ const descriptions:Record<StudyMode,string>={grammar:'Выдели слова выбранным инструментом. Найди подлежащие, сказуемые или единственный главный член.',reason:REASON_INSTRUCTION,lesson:'Короткие серии: правило, разобранный пример, шаг с подсказкой и два самостоятельных задания.',cards:'Вспомни основу или объясни правило. Проверяемые ответы и самооценка учитываются отдельно.',daily:'Повторение по сроку, короткий урок и самостоятельная практика.'};
  return <>{LEARNING_MODES.map(mode=>{
   const plan=studyPlan(state.pack,mode,state.studySessions,state.attempts,day),active=activeFor(state,mode),available=studyActivities(state.pack).some(a=>a.mode===mode);
   return <section className="card study-intro" key={mode}><span className="badge">{mode==='reason'?'ОГЭ № 6':'ОГЭ № 2'}</span><h2 style={{marginTop:20}}>{STUDY_LABELS[mode]}</h2><p>{descriptions[mode]}</p>

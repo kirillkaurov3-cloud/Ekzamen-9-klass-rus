@@ -24,10 +24,35 @@ test('grammar preserves original sentence, keyboard selections and offline feedb
  await page.getByRole('button',{name:'Завершить серию'}).click();await expect(page.getByText('Верно: 4 из 5. С помощью: 1.',{exact:true})).toBeVisible();await page.getByRole('link',{name:'Мой прогресс',exact:true}).click();await expect(page.getByRole('region',{name:'Результаты учебных режимов'})).toContainText('4 / 4 самостоятельно · с помощью: 1');await expect(page.locator('.stat-number').first()).toHaveText(`0 / ${published.graded}`);await context.setOffline(false);
 });
 
-test('reasoning independently checks a correction and its evidence, saves hints and supports native radio keys',async({page},testInfo)=>{
+test('reasoning checks true and false assertions with evidence in two series and keeps saved help',async({page},testInfo)=>{
+ test.setTimeout(90000);
  await page.setViewportSize({width:390,height:844});await page.emulateMedia({colorScheme:'dark',reducedMotion:'reduce'});await book(page);await page.goto('#/workshop/reason');await page.getByRole('button',{name:'Исправить рассуждение',exact:true}).click();await expect(page.getByRole('heading',{name:'Шаг 1 из 5'})).toBeVisible();
  const a=REASON_ACTIVITIES[0];await page.getByRole('radio',{name:a.choices![0].text,exact:true}).check();await saved(page);await page.getByRole('radio',{name:a.choices![0].text,exact:true}).press('ArrowDown');await saved(page);await expect(page.getByRole('radio',{name:a.choices![1].text,exact:true})).toBeFocused();await expect(page.getByRole('radio',{name:a.choices![1].text,exact:true})).toBeChecked();await expect(page.getByRole('button',{name:'Проверить шаг'})).toBeDisabled();await page.getByRole('radio',{name:a.examples![0].text,exact:true}).check();await saved(page);
  await page.getByRole('button',{name:'Нужна подсказка'}).click();await saved(page);await page.reload();await expect(page.getByRole('note')).toBeVisible();await page.getByRole('button',{name:'Проверить шаг'}).click();const feedback=page.getByRole('status',{name:'Результат учебного шага'});await expect(feedback).toContainText('✓ Твоё объяснение');await expect(feedback).toContainText('✕ Твой пример');await expect(feedback).toContainText('кро́ткий');await page.screenshot({path:testInfo.outputPath('reasoning-feedback-390-dark.png'),fullPage:true});
- for(let i=1;i<REASON_ACTIVITIES.length;i++){await page.getByRole('button',{name:'Следующий шаг'}).click();await expect(page.getByRole('heading',{name:`Шаг ${i+1} из 5`})).toBeVisible();const e=REASON_ACTIVITIES[i];await page.getByRole('radio',{name:e.choices!.find(c=>c.id===e.key)!.text,exact:true}).check();await saved(page);await page.getByRole('radio',{name:e.examples!.find(c=>c.id===e.exampleKey)!.text,exact:true}).check();await saved(page);await page.getByRole('button',{name:'Проверить шаг'}).click();await expect(feedback).toContainText('✓ Верно');}
+ const solve=async (exercise:StudyActivity,position:number)=>{
+  await expect(page.getByRole('heading',{name:`Шаг ${position+1} из 5`})).toBeVisible();
+  await expect(page.getByRole('heading',{name:exercise.title,exact:true})).toBeVisible();
+  await page.getByRole('radio',{name:exercise.choices!.find(c=>c.id===exercise.key)!.text,exact:true}).check();
+  await saved(page);
+  await page.getByRole('radio',{name:exercise.examples!.find(c=>c.id===exercise.exampleKey)!.text,exact:true}).check();
+  await saved(page);
+  await page.getByRole('button',{name:'Проверить шаг'}).click();
+  await expect(feedback).toContainText('✓ Верно');
+ };
+ for(const [index,exercise] of REASON_ACTIVITIES.slice(1,5).entries()){
+  await page.getByRole('button',{name:'Следующий шаг'}).click();
+  await solve(exercise,index+1);
+  if(index===0){
+   await expect(feedback).toContainText('Объяснение верно. Подставь «я»');
+   await page.screenshot({path:testInfo.outputPath('reasoning-true-390-dark.png'),fullPage:true});
+  }
+ }
  await page.getByRole('button',{name:'Завершить серию'}).click();await expect(page.getByText('Верно: 4 из 5. С помощью: 1.',{exact:true})).toBeVisible();await page.reload();await expect(page.getByText('Верно: 4 из 5. С помощью: 1.',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Следующая серия'}).click();
+ for(const [index,exercise] of REASON_ACTIVITIES.slice(5).entries()){
+  if(index>0)await page.getByRole('button',{name:'Следующий шаг'}).click();
+  await solve(exercise,index);
+ }
+ await page.getByRole('button',{name:'Завершить серию'}).click();
+ await expect(page.getByText('Верно: 5 из 5. С помощью: 0.',{exact:true})).toBeVisible();
 });

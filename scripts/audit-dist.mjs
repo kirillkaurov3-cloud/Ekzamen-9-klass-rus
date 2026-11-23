@@ -8,7 +8,7 @@ const root=path.resolve('dist');
 const failures=[];
 async function visit(directory){
  for(const entry of await readdir(directory,{withFileTypes:true})){
-  const filename=path.join(directory,entry.name),relative=path.relative(root,filename);
+  const filename=path.join(directory,entry.name),relative=path.relative(root,filename).split(path.sep).join('/');
   if(relative===publishedFile){
    const data=await readFile(filename);const pack=JSON.parse(data);publishedFound=true;
    if(data.length!==catalog.bytes||createHash('sha256').update(data).digest('hex')!==catalog.sha256||pack.packVersion!==catalog.packVersion||pack.tasks.length!==catalog.tasks)failures.push(relative+': версия или контрольная сумма не совпадают');

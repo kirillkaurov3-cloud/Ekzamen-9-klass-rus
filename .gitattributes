@@ -1,0 +1,2 @@
+# Pack bytes must match the size and SHA-256 in src/content/catalog.json.
+/public/packs/*.json -text
