@@ -13,7 +13,7 @@ export default function SourcePage({state}:{state:State}) {
  useEffect(()=>{let live=true;if(checksum)void localSources.files.get(checksum).then(file=>{if(live)setSource(file??null);}).catch(()=>{if(live)setError('Не удалось открыть локальное хранилище.');});return ()=>{live=false;};},[checksum]);
  useEffect(()=>{
   if(!source)return;let live=true,destroy:undefined|(()=>void);setLoading(true);setError('');
-  void (async()=>{try{const pdfjs=await import('pdfjs-dist');if(!live)return;pdfjs.GlobalWorkerOptions.workerSrc=workerUrl;const data=new Uint8Array(await source.file.arrayBuffer());if(!live)return;const task=pdfjs.getDocument({data,useSystemFonts:true});destroy=()=>{void task.destroy();};const document=await task.promise;if(live)setPdf(document);}catch(e){if(live)setError(e instanceof Error?e.message:'Не удалось прочитать PDF.');}finally{if(live)setLoading(false);}})();
+  void (async()=>{try{const pdfjs=await import('pdfjs-dist');if(!live)return;pdfjs.GlobalWorkerOptions.workerSrc=workerUrl;const bytes=source.file instanceof Blob?await source.file.arrayBuffer():source.file.slice(0);if(!live)return;const task=pdfjs.getDocument({data:new Uint8Array(bytes),useSystemFonts:true});destroy=()=>{void task.destroy();};const document=await task.promise;if(live)setPdf(document);}catch(e){if(live)setError(e instanceof Error?e.message:'Не удалось прочитать PDF.');}finally{if(live)setLoading(false);}})();
   return ()=>{live=false;destroy?.();};
  },[source]);
  useEffect(()=>{if(!container.current)return;const observer=new ResizeObserver(([entry])=>setWidth(entry.contentRect.width));observer.observe(container.current);return ()=>observer.disconnect();},[]);

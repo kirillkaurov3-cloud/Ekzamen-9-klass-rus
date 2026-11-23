@@ -12,6 +12,21 @@ it('checks reviewed statement truth and positions by their original keys',()=>{
  for(const [n,group,q,answer] of [[3,2,6,'false'],[3,2,41,'true'],[3,2,52,'false'],[6,7,6,'true'],[6,7,8,'false']] as const){const task=get(n,group,q);expect(check(task,answer).result).toBe('correct');expect(check(task,answer==='true'?'false':'true').result).toBe('wrong');}
  expect(check(get(5,1,11),['1','8']).result).toBe('correct');expect(check(get(5,3,15),['3','4','5','8']).result).toBe('correct');expect(check(get(5,4,5),['1','2','7','8']).result).toBe('correct');expect(check(get(7,1,64),['3','5','8','9']).result).toBe('correct');
 });
-it('keeps unresolved primary records and all table assessments ungraded',()=>{
- const primary=pack.tasks.filter(t=>t.type==='self'&&!t.id.endsWith('-table')).map(t=>t.id);expect(primary.sort()).toEqual([get(4,5,3).id,get(6,4,57).id,get(6,8,47).id,get(12,3,9).id].sort());expect(pack.tasks.filter(t=>t.type==='self'&&t.id.endsWith('-table'))).toHaveLength(90);expect(pack.tasks.filter(t=>t.type!=='self')).toHaveLength(1533);
+it('restores the page with options 41–51 and checks the unshifted punctuation key',()=>{
+ const task=get(4,5,3);
+ expect(task.source).toMatchObject({pages:[126,127,128,129],answerPages:[437]});
+ expect(task.options).toHaveLength(51);
+ expect(task.options.at(-1)?.text).toContain('Я помню чудное мгновенье');
+ const key=['2','6','10','13','17','18','22','23','25','27','30','33','38','41','42','43','44','45','47','48','49','51'];
+ expect(check(task,key).result).toBe('correct');
+ expect(check(task,key.filter(value=>Number(value)<=40)).result).toBe('wrong');
+});
+it('grades corrected spelling assertions and leaves only source answer tables as self-assessments',()=>{
+ expect(get(6,4,57)).toMatchObject({version:2,key:'false',source:{answerPages:[]}});
+ expect([43,44,45,46,47].map(number=>get(6,8,number).key)).toEqual(['false','true','false','true','false']);
+ expect(get(6,8,43).source.answerPages).toEqual([]);
+ expect(get(6,8,47).source.answerPages).toEqual([474]);
+ expect(pack.tasks.filter(t=>t.type==='self').every(t=>t.id.endsWith('-table'))).toBe(true);
+ expect(pack.tasks.filter(t=>t.type==='self')).toHaveLength(90);
+ expect(pack.tasks.filter(t=>t.type!=='self')).toHaveLength(1537);
 });
