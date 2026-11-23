@@ -6,6 +6,9 @@ test('lexical meaning accepts reviewed base forms, shows a concrete explanation 
   await page.getByRole('textbox',{name:'Твой ответ',exact:true}).fill(answer);await expect(page.getByText('Ответ сохранён',{exact:true})).toBeVisible();
   if(answer==='бомбардир'){
    // Simulate the visual viewport reported while the mobile keyboard is open.
+   const field=page.getByRole('textbox',{name:'Твой ответ',exact:true});
+   await field.focus();
+   await expect(field).toBeFocused();
    await page.evaluate(()=>{
     const viewport=window.visualViewport!;
     Object.defineProperty(viewport,'height',{configurable:true,get:()=>window.innerHeight-270});
